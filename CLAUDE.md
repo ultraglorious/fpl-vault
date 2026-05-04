@@ -13,7 +13,7 @@ uv run python infer_endpoint_schema.py  # Fetch live API data and print CREATE T
 
 ## Architecture
 
-Ingests FPL data from undocumented public endpoints (`https://fantasy.premierleague.com/api/`) into a DuckDB database of player and team data. The immediate goal is building out the database; the eventual goal is using it with dbt models to help pick teams.
+Ingests FPL data from undocumented public endpoints (`https://fantasy.premierleague.com/api/`) into a DuckDB database of player and team data. See `API_ENDPOINTS.md` for the full endpoint catalog. The immediate goal is building out the database; the eventual goal is using it with dbt models to help pick teams.
 
 - **`api_client.py`** — Thin wrapper around `requests`. Provides `get`/`post`/`put`/`delete` methods. `put` and `delete` are currently stubs.
 - **`database_manager.py`** — `DatabaseManager(db_path)` opens a DuckDB connection (defaults to `fpl.duckdb`). `create_table()` generates valid `CREATE TABLE` statements from a schema dict and prints them. `execute_query()` runs SQL against the connection. `map_to_duckdb_types()` bridges Python type names to DuckDB types (`TEXT`, `INTEGER`, `DOUBLE`, `BOOLEAN`, `JSON`, `TIMESTAMP`) and auto-marks `id` columns as primary keys.
