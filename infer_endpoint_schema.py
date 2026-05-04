@@ -30,7 +30,7 @@ def _python_type_name(value):
 
 
 def infer_record_schema(records: list) -> list[dict]:
-    """Extract column definitions from a list of record dicts by sampling the first element."""
+    """Extract column definitions from a list of record dicts."""
     if not records:
         raise ValueError("Empty record list")
     if not isinstance(records[0], dict):
@@ -51,10 +51,16 @@ def infer_record_schema(records: list) -> list[dict]:
             if type_name is None:
                 type_name = "str"
 
+        nullable = False
+        for record in records:
+            if record.get(key) is None:
+                nullable = True
+                break
+
         columns.append({
             "name": key,
             "type": type_name,
-            "nullable": value is None,
+            "nullable": nullable,
         })
 
     return columns

@@ -1,3 +1,8 @@
+import json
+import os
+import shutil
+from datetime import datetime
+
 import duckdb
 
 
@@ -9,6 +14,17 @@ PYTHON_TO_DUCKDB: dict[str, str] = {
     "jsonb": "JSON",
     "datetime": "TIMESTAMP",
 }
+
+
+def backup_db(db_path: str) -> str | None:
+    """Create a timestamped backup. Returns the backup path or None if source doesn't exist."""
+    if not os.path.exists(db_path):
+        return None
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = f"{db_path}.{timestamp}.bak"
+    shutil.copy2(db_path, backup_path)
+    print(f"Backed up {db_path} -> {backup_path}")
+    return backup_path
 
 
 def map_to_duckdb_types(schema: dict) -> dict:
@@ -32,13 +48,14 @@ def map_to_duckdb_types(schema: dict) -> dict:
 
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "fpl.duckdb"):
+    def __init__(self, db_path: str = "fpl_dev.duckdb"):
+        self.db_path = db_path
         self.conn = duckdb.connect(db_path)
 
     def close(self):
         self.conn.close()
 
-    def create_table(self, schema: dict) -> None:
+    def create_table(self, schema: dict, execute: bool = False, if_not_exists: bool = True) -> str:
         table_name = schema["table_name"]
         lines = []
 
@@ -49,6 +66,9 @@ class DatabaseManager:
 
             if not column.get("nullable", True):
                 parts.append("NOT NULL")
+
+            if column.get("unique", False):
+                parts.append("UNIQUE")
 
             if column.get("primary_key", False):
                 parts.append("PRIMARY KEY")
@@ -65,14 +85,82 @@ class DatabaseManager:
             )
             lines.append(fk_def)
 
+        if_not_exists_clause = "IF NOT EXISTS " if if_not_exists else ""
         query = (
-            f"CREATE TABLE {table_name} (\n"
+            f"CREATE TABLE {if_not_exists_clause}{table_name} (\n"
             f"  " + ",\n  ".join(lines) + "\n"
             f");"
         )
 
         print(query)
-        # self.conn.execute(query)
+        if execute:
+            self.conn.execute(query)
+            print(f"  -> created {table_name}")
+        return query
+
+    def drop_table(self, table_name: str) -> None:
+        self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+        print(f"Dropped {table_name} (if existed)")
+
+    def insert_rows(self, table_name: str, rows: list[dict], json_columns: set[str] | None = None) -> int:
+        if not rows:
+            return 0
+
+        if json_columns is None:
+            json_columns = set()
+
+        columns = list(rows[0].keys())
+        placeholders = ", ".join(["?"] * len(columns))
+        col_names = ", ".join(columns)
+        query = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders})"
+
+        values = []
+        for row in rows:
+            value_row = []
+            for col in columns:
+                val = row[col]
+                if col in json_columns and isinstance(val, (dict, list)):
+                    val = json.dumps(val)
+                value_row.append(val)
+            values.append(tuple(value_row))
+
+        self.conn.executemany(query, values)
+        print(f"Inserted {len(rows)} rows into {table_name}")
+        return len(rows)
+
+    def upsert_rows(self, table_name: str, rows: list[dict], pk_columns: list[str], json_columns: set[str] | None = None) -> int:
+        if not rows:
+            return 0
+
+        if json_columns is None:
+            json_columns = set()
+
+        columns = list(rows[0].keys())
+        placeholders = ", ".join(["?"] * len(columns))
+        col_names = ", ".join(columns)
+
+        update_cols = [c for c in columns if c not in pk_columns]
+        set_clause = ", ".join(f"{c} = excluded.{c}" for c in update_cols)
+        pk_list = ", ".join(pk_columns)
+
+        query = (
+            f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders}) "
+            f"ON CONFLICT ({pk_list}) DO UPDATE SET {set_clause}"
+        )
+
+        values = []
+        for row in rows:
+            value_row = []
+            for col in columns:
+                val = row[col]
+                if col in json_columns and isinstance(val, (dict, list)):
+                    val = json.dumps(val)
+                value_row.append(val)
+            values.append(tuple(value_row))
+
+        self.conn.executemany(query, values)
+        print(f"Upserted {len(rows)} rows into {table_name}")
+        return len(rows)
 
     def execute_query(self, query: str) -> None:
         try:

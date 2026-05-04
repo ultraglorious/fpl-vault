@@ -179,9 +179,85 @@ class TestCreateTable:
         assert output.strip().endswith(";")
         db.close()
 
+    def test_unique_constraint(self):
+        db = DatabaseManager(":memory:")
+        schema = {
+            "table_name": "t",
+            "columns": [
+                {"name": "name", "data_type": "TEXT", "unique": True},
+            ],
+        }
+        import io
+        import sys
+        captured = io.StringIO()
+        sys.stdout = captured
+        db.create_table(schema)
+        sys.stdout = sys.__stdout__
+        output = captured.getvalue()
+        assert "UNIQUE" in output
+        db.close()
+
+    def test_if_not_exists_default(self):
+        db = DatabaseManager(":memory:")
+        schema = {
+            "table_name": "t",
+            "columns": [
+                {"name": "id", "data_type": "INTEGER", "primary_key": True},
+            ],
+        }
+        import io
+        import sys
+        captured = io.StringIO()
+        sys.stdout = captured
+        db.create_table(schema)
+        sys.stdout = sys.__stdout__
+        output = captured.getvalue()
+        assert "IF NOT EXISTS" in output
+        db.close()
+
     def test_execute_query_works(self):
         db = DatabaseManager(":memory:")
         db.execute_query("CREATE TABLE t (id INTEGER)")
         result = db.conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         assert ("t",) in result
+        db.close()
+
+
+class TestUpsertRows:
+    def test_inserts_into_empty_table(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.upsert_rows("t", [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}], pk_columns=["id"])
+        result = db.conn.execute("SELECT COUNT(*) FROM t").fetchone()
+        assert result[0] == 2
+        db.close()
+
+    def test_updates_existing_rows(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.upsert_rows("t", [{"id": 1, "name": "old"}], pk_columns=["id"])
+        db.upsert_rows("t", [{"id": 1, "name": "new"}], pk_columns=["id"])
+        result = db.conn.execute("SELECT id, name FROM t WHERE id = 1").fetchone()
+        assert result[1] == "new"
+        count = db.conn.execute("SELECT COUNT(*) FROM t").fetchone()
+        assert count[0] == 1
+        db.close()
+
+    def test_mixed_insert_and_update(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.upsert_rows("t", [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}], pk_columns=["id"])
+        db.upsert_rows("t", [{"id": 1, "name": "updated"}, {"id": 3, "name": "c"}], pk_columns=["id"])
+        count = db.conn.execute("SELECT COUNT(*) FROM t").fetchone()
+        assert count[0] == 3
+        name = db.conn.execute("SELECT name FROM t WHERE id = 1").fetchone()
+        assert name[0] == "updated"
+        db.close()
+
+    def test_handles_json_columns(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, data JSON)")
+        db.upsert_rows("t", [{"id": 1, "data": {"key": "value"}}], pk_columns=["id"], json_columns={"data"})
+        result = db.conn.execute("SELECT data FROM t WHERE id = 1").fetchone()
+        assert result[0] == '{"key": "value"}'
         db.close()
