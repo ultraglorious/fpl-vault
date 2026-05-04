@@ -20,3 +20,6 @@ wheels/
 
 # Environment File
 .env
+
+# Database
+*.duckdb

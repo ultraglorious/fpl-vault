@@ -1,49 +1,101 @@
-from typing import Dict
+import re
+from typing import Dict, List
 from api_client import APIClient
 
-def UnknownDataType(Exception):
+
+class UnknownDataType(Exception):
     pass
 
-def infer_response_schema(json_data: dict):
-    if len(json_data) == 0:
+
+ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
+
+
+def _python_type_name(value):
+    """Map a Python value to a type name string. Returns None for None values."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, str):
+        if ISO_DATETIME_RE.match(value):
+            return "datetime"
+        return "str"
+    if isinstance(value, (dict, list)):
+        return "jsonb"
+    raise UnknownDataType(f"No type mapping for value: {type(value).__name__}")
+
+
+def infer_record_schema(records: list) -> list[dict]:
+    """Extract column definitions from a list of record dicts by sampling the first element."""
+    if not records:
+        raise ValueError("Empty record list")
+    if not isinstance(records[0], dict):
+        raise ValueError("List elements must be dicts")
+
+    first = records[0]
+    columns = []
+
+    for key, value in first.items():
+        type_name = _python_type_name(value)
+
+        if type_name is None:
+            for i in range(1, min(len(records), 6)):
+                v = records[i].get(key)
+                type_name = _python_type_name(v)
+                if type_name is not None:
+                    break
+            if type_name is None:
+                type_name = "str"
+
+        columns.append({
+            "name": key,
+            "type": type_name,
+            "nullable": value is None,
+        })
+
+    return columns
+
+
+def infer_response_schema(json_data: dict) -> list[dict]:
+    """Walk top-level keys of an API response dict and produce a list of table schema dicts."""
+    if not json_data:
         raise ValueError("API response is empty")
-    
-    if isinstance(json_data, list):
-        # If JSON is a list type then extract schema from the first item in the list
-        # (assuming all items have the same structure)
-        sample_item = json_data[0]
-        schema: Dict[str, str] = {}
 
-        for key, value in sample_item.items():
-            if isinstance(value, dict):
-                schema[key] = "dict"
-            elif isinstance(value, list):
-                schema[key] = "list"
-            elif isinstance(value, int):
-                schema[key] = "int"
-            elif isinstance(value, float):
-                schema[key] = "float"
-            elif isinstance(value, str):
-                schema[key] = "str"
-            else:
-                schema[key] = "unknown"
-    elif isinstance(json_data, dict):
-        # If JSON is a dictionary type then we need to navigate down into the dictionary
-        schema: Dict[str, str] = {}
-        for key, value in json_data.items():
-            pass
+    tables = []
 
+    for key, value in json_data.items():
+        if isinstance(value, list):
+            if len(value) == 0:
+                continue
+            if isinstance(value[0], dict):
+                columns = infer_record_schema(value)
+                tables.append({"table_name": key, "columns": columns})
+        elif isinstance(value, dict):
+            wrapped = [value]
+            columns = infer_record_schema(wrapped)
+            tables.append({"table_name": key, "columns": columns})
 
-    return schema
+    return tables
+
 
 if __name__ == '__main__':
+    from database_manager import map_to_duckdb_types, DatabaseManager
+
     client = APIClient(base_url='https://fantasy.premierleague.com/api/')
+    print("Fetching bootstrap-static data...")
     response = client.get(endpoint='bootstrap-static')
-    print(len(response))
-    for key, value in response.items():
-        print(f'key:{key}, value_type:{type(value)}')
-        # print(value)
-    print(response['teams'][0])
-    print('yo')
-    # schema = infer_response_schema(response)
-    # print(schema)
+
+    table_schemas = infer_response_schema(response)
+    print(f"Detected {len(table_schemas)} tables.\n")
+
+    for table in table_schemas:
+        pg_table = map_to_duckdb_types(table)
+        table_name = pg_table["table_name"]
+        print(f"-- Table: {table_name} ({len(pg_table['columns'])} columns)")
+        db = DatabaseManager()
+        db.create_table(pg_table)
+        print()
