@@ -85,7 +85,7 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
 
 def main():
     live = "--live" in sys.argv
-    db_path = "fpl.duckdb" if live else "fpl_dev.duckdb"
+    db_path = "data/fpl.duckdb" if live else "data/fpl_dev.duckdb"
 
     if live:
         backup_db(db_path)

@@ -16,12 +16,14 @@ PYTHON_TO_DUCKDB: dict[str, str] = {
 }
 
 
-def backup_db(db_path: str) -> str | None:
+def backup_db(db_path: str, backup_dir: str = "data/backups") -> str | None:
     """Create a timestamped backup. Returns the backup path or None if source doesn't exist."""
     if not os.path.exists(db_path):
         return None
+    os.makedirs(backup_dir, exist_ok=True)
+    filename = os.path.basename(db_path)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = f"{db_path}.{timestamp}.bak"
+    backup_path = os.path.join(backup_dir, f"{filename}.{timestamp}.bak")
     shutil.copy2(db_path, backup_path)
     print(f"Backed up {db_path} -> {backup_path}")
     return backup_path
@@ -48,7 +50,7 @@ def map_to_duckdb_types(schema: dict) -> dict:
 
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "fpl_dev.duckdb"):
+    def __init__(self, db_path: str = "data/fpl_dev.duckdb"):
         self.db_path = db_path
         self.conn = duckdb.connect(db_path)
 
