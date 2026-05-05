@@ -18,11 +18,12 @@ PYTHON_TO_DUCKDB: dict[str, str] = {
 }
 
 
-def backup_db(db_path: str, backup_dir: str = "data/backups") -> str | None:
+def backup_db(db_path: str, backup_dir: str | None = None) -> str | None:
     """Create a timestamped backup. Returns the backup path or None if source doesn't exist."""
     if not os.path.exists(db_path):
         return None
-    os.makedirs(backup_dir, exist_ok=True)
+    if backup_dir is None:
+        backup_dir = os.path.join(os.getenv("DATA_DIR", "data"), "backups")
     filename = os.path.basename(db_path)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(backup_dir, f"{filename}.{timestamp}.bak")
@@ -100,7 +101,7 @@ def load_table_schemas(yml_path: str | Path) -> dict[str, dict]:
 
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "data/fpl_dev.duckdb", schema: str | None = None):
+    def __init__(self, db_path: str, schema: str | None = None):
         self.db_path = db_path
         self.schema = schema
         self.conn = duckdb.connect(db_path)

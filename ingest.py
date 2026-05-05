@@ -1,14 +1,17 @@
 """Ingest FPL API data into DuckDB.
 
 Usage:
-    uv run python ingest.py           # Target fpl_dev.duckdb (default)
-    uv run python ingest.py --live    # Target fpl.duckdb with backup
+    uv run python ingest.py           # Target footballdb_dev.duckdb (default)
+    uv run python ingest.py --live    # Target footballdb.duckdb with backup
 """
 
+import os
 import sys
 
+from dotenv import load_dotenv
+
 from api_client import APIClient
-from database_manager import DatabaseManager, backup_db, load_table_schemas, map_to_duckdb_types
+from database_manager import DatabaseManager, PYTHON_TO_DUCKDB, backup_db, load_table_schemas, map_to_duckdb_types
 from infer_endpoint_schema import infer_response_schema
 
 ENDPOINTS = ["bootstrap-static"]
@@ -45,7 +48,7 @@ SCHEMA_YML = "datasources.yml"
 
 def _validate_schema(table_name: str, inferred: dict, yaml_schema: dict) -> None:
     """Compare inferred columns against the YAML schema, print warnings on diffs."""
-    inferred_cols = {c["name"]: c["type"] for c in inferred["columns"]}
+    inferred_cols = {c["name"]: PYTHON_TO_DUCKDB.get(c["type"], c["type"]) for c in inferred["columns"]}
     yaml_cols = {c["name"]: c["data_type"] for c in yaml_schema["columns"]}
 
     new_cols = set(inferred_cols) - set(yaml_cols)
@@ -53,7 +56,6 @@ def _validate_schema(table_name: str, inferred: dict, yaml_schema: dict) -> None
     type_diffs = []
     for name in set(inferred_cols) & set(yaml_cols):
         if inferred_cols[name] != yaml_cols[name]:
-            # Convert DuckDB type back to Python type name for comparison
             type_diffs.append((name, inferred_cols[name], yaml_cols[name]))
 
     if new_cols:
@@ -119,8 +121,12 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
 
 
 def main():
+    load_dotenv()
     live = "--live" in sys.argv
-    db_path = "data/fpl.duckdb" if live else "data/fpl_dev.duckdb"
+    db_name = os.getenv("DB_NAME", "footballdb")
+    data_dir = os.getenv("DATA_DIR", "data")
+    suffix = "" if live else "_dev"
+    db_path = f"{data_dir}/{db_name}{suffix}.duckdb"
 
     if live:
         backup_db(db_path)

@@ -102,6 +102,6 @@ if __name__ == '__main__':
         pg_table = map_to_duckdb_types(table)
         table_name = pg_table["table_name"]
         print(f"-- Table: {table_name} ({len(pg_table['columns'])} columns)")
-        db = DatabaseManager(schema="fpl_api")
+        db = DatabaseManager(":memory:", schema="fpl_api")
         db.create_table(pg_table)
         print()
