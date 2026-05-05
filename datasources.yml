@@ -1,0 +1,673 @@
+version: 2
+
+sources:
+  - name: fpl_api
+    description: Raw data from fantasy.premierleague.com API (bootstrap-static endpoint)
+    schema: fpl_api
+    tables:
+      - name: chips
+        primary_key: id
+        columns:
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: name
+            data_type: TEXT
+            tests: [not_null]
+          - name: number
+            data_type: INTEGER
+            tests: [not_null]
+          - name: start_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: stop_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: chip_type
+            data_type: TEXT
+            tests: [not_null]
+          - name: overrides
+            data_type: JSON
+            tests: [not_null]
+
+      - name: events
+        primary_key: id
+        columns:
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: name
+            data_type: TEXT
+            tests: [not_null]
+          - name: deadline_time
+            data_type: TIMESTAMP
+            tests: [not_null]
+          - name: release_time
+            data_type: TEXT
+          - name: average_entry_score
+            data_type: INTEGER
+            tests: [not_null]
+          - name: finished
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: data_checked
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: highest_scoring_entry
+            data_type: INTEGER
+          - name: deadline_time_epoch
+            data_type: INTEGER
+            tests: [not_null]
+          - name: deadline_time_game_offset
+            data_type: INTEGER
+            tests: [not_null]
+          - name: highest_score
+            data_type: INTEGER
+          - name: is_previous
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: is_current
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: is_next
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: cup_leagues_created
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: h2h_ko_matches_created
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: can_enter
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: can_manage
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: released
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: ranked_count
+            data_type: INTEGER
+            tests: [not_null]
+          - name: overrides
+            data_type: JSON
+            tests: [not_null]
+          - name: chip_plays
+            data_type: JSON
+            tests: [not_null]
+          - name: most_selected
+            data_type: INTEGER
+          - name: most_transferred_in
+            data_type: INTEGER
+          - name: top_element
+            data_type: INTEGER
+          - name: top_element_info
+            data_type: JSON
+          - name: transfers_made
+            data_type: INTEGER
+            tests: [not_null]
+          - name: most_captained
+            data_type: INTEGER
+          - name: most_vice_captained
+            data_type: INTEGER
+
+      - name: game_settings
+        primary_key: "!singleton"
+        columns:
+          - name: league_join_private_max
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_join_public_max
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_max_size_public_classic
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_max_size_public_h2h
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_max_size_private_h2h
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_max_ko_rounds_private_h2h
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_prefix_public
+            data_type: TEXT
+            tests: [not_null]
+          - name: league_points_h2h_win
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_points_h2h_lose
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_points_h2h_draw
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_ko_first_instead_of_random
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: cup_start_event_id
+            data_type: TEXT
+          - name: cup_stop_event_id
+            data_type: TEXT
+          - name: cup_qualifying_method
+            data_type: TEXT
+          - name: cup_type
+            data_type: TEXT
+          - name: featured_entries
+            data_type: JSON
+            tests: [not_null]
+          - name: element_sell_at_purchase_price
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: percentile_ranks
+            data_type: JSON
+            tests: [not_null]
+          - name: underdog_differential
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_squadplay
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_squadsize
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_special_min
+            data_type: TEXT
+          - name: squad_special_max
+            data_type: TEXT
+          - name: squad_team_limit
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_total_spend
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ui_currency_multiplier
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ui_use_special_shirts
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: ui_special_shirt_exclusions
+            data_type: JSON
+            tests: [not_null]
+          - name: stats_form_days
+            data_type: INTEGER
+            tests: [not_null]
+          - name: sys_vice_captain_enabled
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: transfers_cap
+            data_type: INTEGER
+            tests: [not_null]
+          - name: transfers_sell_on_fee
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: max_extra_free_transfers
+            data_type: INTEGER
+            tests: [not_null]
+          - name: league_h2h_tiebreak_stats
+            data_type: JSON
+            tests: [not_null]
+          - name: timezone
+            data_type: TEXT
+            tests: [not_null]
+
+      - name: game_config
+        primary_key: "!singleton"
+        columns:
+          - name: settings
+            data_type: JSON
+            tests: [not_null]
+          - name: rules
+            data_type: JSON
+            tests: [not_null]
+          - name: scoring
+            data_type: JSON
+            tests: [not_null]
+
+      - name: phases
+        primary_key: id
+        columns:
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: name
+            data_type: TEXT
+            tests: [not_null]
+          - name: start_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: stop_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: highest_score
+            data_type: INTEGER
+            tests: [not_null]
+
+      - name: teams
+        primary_key: id
+        columns:
+          - name: code
+            data_type: INTEGER
+            tests: [not_null]
+          - name: draw
+            data_type: INTEGER
+            tests: [not_null]
+          - name: form
+            data_type: TEXT
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: loss
+            data_type: INTEGER
+            tests: [not_null]
+          - name: name
+            data_type: TEXT
+            tests: [not_null]
+          - name: played
+            data_type: INTEGER
+            tests: [not_null]
+          - name: points
+            data_type: INTEGER
+            tests: [not_null]
+          - name: position
+            data_type: INTEGER
+            tests: [not_null]
+          - name: short_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: strength
+            data_type: INTEGER
+            tests: [not_null]
+          - name: team_division
+            data_type: TEXT
+          - name: unavailable
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: win
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_overall_home
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_overall_away
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_attack_home
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_attack_away
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_defence_home
+            data_type: INTEGER
+            tests: [not_null]
+          - name: strength_defence_away
+            data_type: INTEGER
+            tests: [not_null]
+          - name: pulse_id
+            data_type: INTEGER
+            tests: [not_null]
+
+      - name: element_stats
+        primary_key: name
+        columns:
+          - name: label
+            data_type: TEXT
+            tests: [not_null]
+          - name: name
+            data_type: TEXT
+            tests: [unique, not_null]
+
+      - name: element_types
+        primary_key: id
+        columns:
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: plural_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: plural_name_short
+            data_type: TEXT
+            tests: [not_null]
+          - name: singular_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: singular_name_short
+            data_type: TEXT
+            tests: [not_null]
+          - name: squad_select
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_min_select
+            data_type: TEXT
+          - name: squad_max_select
+            data_type: TEXT
+          - name: squad_min_play
+            data_type: INTEGER
+            tests: [not_null]
+          - name: squad_max_play
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ui_shirt_specific
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: sub_positions_locked
+            data_type: JSON
+            tests: [not_null]
+          - name: element_count
+            data_type: INTEGER
+            tests: [not_null]
+
+      - name: elements
+        primary_key: id
+        columns:
+          - name: can_transact
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: can_select
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: chance_of_playing_next_round
+            data_type: INTEGER
+          - name: chance_of_playing_this_round
+            data_type: INTEGER
+          - name: code
+            data_type: INTEGER
+            tests: [not_null]
+          - name: cost_change_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: cost_change_event_fall
+            data_type: INTEGER
+            tests: [not_null]
+          - name: cost_change_start
+            data_type: INTEGER
+            tests: [not_null]
+          - name: cost_change_start_fall
+            data_type: INTEGER
+            tests: [not_null]
+          - name: price_change_percent
+            data_type: TEXT
+            tests: [not_null]
+          - name: dreamteam_count
+            data_type: INTEGER
+            tests: [not_null]
+          - name: element_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ep_next
+            data_type: TEXT
+            tests: [not_null]
+          - name: ep_this
+            data_type: TEXT
+            tests: [not_null]
+          - name: event_points
+            data_type: INTEGER
+            tests: [not_null]
+          - name: first_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: form
+            data_type: TEXT
+            tests: [not_null]
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: in_dreamteam
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: news
+            data_type: TEXT
+            tests: [not_null]
+          - name: news_added
+            data_type: TIMESTAMP
+          - name: now_cost
+            data_type: INTEGER
+            tests: [not_null]
+          - name: photo
+            data_type: TEXT
+            tests: [not_null]
+          - name: points_per_game
+            data_type: TEXT
+            tests: [not_null]
+          - name: removed
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: second_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: selected_by_percent
+            data_type: TEXT
+            tests: [not_null]
+          - name: special
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: squad_number
+            data_type: TEXT
+          - name: status
+            data_type: TEXT
+            tests: [not_null]
+          - name: team
+            data_type: INTEGER
+            tests: [not_null]
+          - name: team_code
+            data_type: INTEGER
+            tests: [not_null]
+          - name: total_points
+            data_type: INTEGER
+            tests: [not_null]
+          - name: transfers_in
+            data_type: INTEGER
+            tests: [not_null]
+          - name: transfers_in_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: transfers_out
+            data_type: INTEGER
+            tests: [not_null]
+          - name: transfers_out_event
+            data_type: INTEGER
+            tests: [not_null]
+          - name: value_form
+            data_type: TEXT
+            tests: [not_null]
+          - name: value_season
+            data_type: TEXT
+            tests: [not_null]
+          - name: web_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: known_name
+            data_type: TEXT
+            tests: [not_null]
+          - name: region
+            data_type: INTEGER
+          - name: team_join_date
+            data_type: TEXT
+          - name: birth_date
+            data_type: TEXT
+          - name: has_temporary_code
+            data_type: BOOLEAN
+            tests: [not_null]
+          - name: opta_code
+            data_type: TEXT
+            tests: [not_null]
+          - name: minutes
+            data_type: INTEGER
+            tests: [not_null]
+          - name: goals_scored
+            data_type: INTEGER
+            tests: [not_null]
+          - name: assists
+            data_type: INTEGER
+            tests: [not_null]
+          - name: clean_sheets
+            data_type: INTEGER
+            tests: [not_null]
+          - name: goals_conceded
+            data_type: INTEGER
+            tests: [not_null]
+          - name: own_goals
+            data_type: INTEGER
+            tests: [not_null]
+          - name: penalties_saved
+            data_type: INTEGER
+            tests: [not_null]
+          - name: penalties_missed
+            data_type: INTEGER
+            tests: [not_null]
+          - name: yellow_cards
+            data_type: INTEGER
+            tests: [not_null]
+          - name: red_cards
+            data_type: INTEGER
+            tests: [not_null]
+          - name: saves
+            data_type: INTEGER
+            tests: [not_null]
+          - name: bonus
+            data_type: INTEGER
+            tests: [not_null]
+          - name: bps
+            data_type: INTEGER
+            tests: [not_null]
+          - name: influence
+            data_type: TEXT
+            tests: [not_null]
+          - name: creativity
+            data_type: TEXT
+            tests: [not_null]
+          - name: threat
+            data_type: TEXT
+            tests: [not_null]
+          - name: ict_index
+            data_type: TEXT
+            tests: [not_null]
+          - name: clearances_blocks_interceptions
+            data_type: INTEGER
+            tests: [not_null]
+          - name: recoveries
+            data_type: INTEGER
+            tests: [not_null]
+          - name: tackles
+            data_type: INTEGER
+            tests: [not_null]
+          - name: defensive_contribution
+            data_type: INTEGER
+            tests: [not_null]
+          - name: starts
+            data_type: INTEGER
+            tests: [not_null]
+          - name: expected_goals
+            data_type: TEXT
+            tests: [not_null]
+          - name: expected_assists
+            data_type: TEXT
+            tests: [not_null]
+          - name: expected_goal_involvements
+            data_type: TEXT
+            tests: [not_null]
+          - name: expected_goals_conceded
+            data_type: TEXT
+            tests: [not_null]
+          - name: corners_and_indirect_freekicks_order
+            data_type: TEXT
+          - name: corners_and_indirect_freekicks_text
+            data_type: TEXT
+            tests: [not_null]
+          - name: direct_freekicks_order
+            data_type: TEXT
+          - name: direct_freekicks_text
+            data_type: TEXT
+            tests: [not_null]
+          - name: penalties_order
+            data_type: TEXT
+          - name: penalties_text
+            data_type: TEXT
+            tests: [not_null]
+          - name: scout_risks
+            data_type: JSON
+            tests: [not_null]
+          - name: scout_news_link
+            data_type: TEXT
+            tests: [not_null]
+          - name: influence_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: influence_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: creativity_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: creativity_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: threat_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: threat_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ict_index_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: ict_index_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: expected_goals_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: saves_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: expected_assists_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: expected_goal_involvements_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: expected_goals_conceded_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: goals_conceded_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: now_cost_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: now_cost_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: form_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: form_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: points_per_game_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: points_per_game_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: selected_rank
+            data_type: INTEGER
+            tests: [not_null]
+          - name: selected_rank_type
+            data_type: INTEGER
+            tests: [not_null]
+          - name: starts_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: clean_sheets_per_90
+            data_type: DOUBLE
+            tests: [not_null]
+          - name: defensive_contribution_per_90
+            data_type: DOUBLE
+            tests: [not_null]

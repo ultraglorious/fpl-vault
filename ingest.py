@@ -8,7 +8,7 @@ Usage:
 import sys
 
 from api_client import APIClient
-from database_manager import DatabaseManager, backup_db, map_to_duckdb_types
+from database_manager import DatabaseManager, backup_db, load_table_schemas, map_to_duckdb_types
 from infer_endpoint_schema import infer_response_schema
 
 ENDPOINTS = ["bootstrap-static"]
@@ -40,6 +40,31 @@ def _json_columns(schema: dict) -> set[str]:
     return {c["name"] for c in schema["columns"] if c["data_type"] == "JSON"}
 
 
+SCHEMA_YML = "datasources.yml"
+
+
+def _validate_schema(table_name: str, inferred: dict, yaml_schema: dict) -> None:
+    """Compare inferred columns against the YAML schema, print warnings on diffs."""
+    inferred_cols = {c["name"]: c["type"] for c in inferred["columns"]}
+    yaml_cols = {c["name"]: c["data_type"] for c in yaml_schema["columns"]}
+
+    new_cols = set(inferred_cols) - set(yaml_cols)
+    missing_cols = set(yaml_cols) - set(inferred_cols)
+    type_diffs = []
+    for name in set(inferred_cols) & set(yaml_cols):
+        if inferred_cols[name] != yaml_cols[name]:
+            # Convert DuckDB type back to Python type name for comparison
+            type_diffs.append((name, inferred_cols[name], yaml_cols[name]))
+
+    if new_cols:
+        print(f"  [DRIFT] {table_name}: new columns in API not in datasources.yml: {new_cols}")
+    if missing_cols:
+        print(f"  [DRIFT] {table_name}: columns in datasources.yml missing from API: {missing_cols}")
+    if type_diffs:
+        for name, inf_type, yml_type in type_diffs:
+            print(f"  [DRIFT] {table_name}.{name}: API has {inf_type}, datasources.yml has {yml_type}")
+
+
 def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
     client = APIClient(base_url="https://fantasy.premierleague.com/api/")
     print(f"\n{'='*60}")
@@ -49,9 +74,18 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
     response = client.get(endpoint=endpoint)
     tables = infer_response_schema(response)
 
+    yaml_schemas = load_table_schemas(SCHEMA_YML)
+
     for table in tables:
-        mapped = map_to_duckdb_types(table)
-        table_name = mapped["table_name"]
+        table_name = table["table_name"]
+
+        yaml_schema = yaml_schemas.get(table_name)
+        if yaml_schema:
+            mapped = yaml_schema
+            _validate_schema(table_name, table, yaml_schema)
+        else:
+            print(f"  [WARN] {table_name} not in {SCHEMA_YML} — using inferred types")
+            mapped = map_to_duckdb_types(table)
 
         rows = response[table_name]
         if isinstance(rows, dict):
@@ -61,8 +95,9 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
             continue
 
         key_info = TABLE_KEY_MAP.get(table_name, {})
+        pk_value = mapped.get("primary_key")
 
-        if key_info.get("type") == "singleton":
+        if pk_value == "!singleton":
             mapped["columns"].insert(0, {
                 "name": "id",
                 "data_type": "INTEGER",
@@ -90,7 +125,7 @@ def main():
     if live:
         backup_db(db_path)
 
-    db = DatabaseManager(db_path)
+    db = DatabaseManager(db_path, schema="fpl_api")
     print(f"Target database: {db_path}")
 
     try:

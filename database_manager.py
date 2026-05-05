@@ -2,8 +2,10 @@ import json
 import os
 import shutil
 from datetime import datetime
+from pathlib import Path
 
 import duckdb
+import yaml
 
 
 PYTHON_TO_DUCKDB: dict[str, str] = {
@@ -49,13 +51,68 @@ def map_to_duckdb_types(schema: dict) -> dict:
     return result
 
 
+def load_table_schemas(yml_path: str | Path) -> dict[str, dict]:
+    """Read a dbt-format datasources.yml and return schema dicts for create_table().
+
+    Returns a dict keyed by table name. Each value is a schema dict with
+    ``table_name`` and ``columns``, compatible with DatabaseManager.create_table().
+    The ``primary_key`` table-level field in the YAML is preserved as a top-level
+    key on the schema dict (ingest.py uses it for upsert detection).
+    """
+    path = Path(yml_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Schema file not found: {path}")
+
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+
+    schemas: dict[str, dict] = {}
+
+    for source in data.get("sources", []):
+        for table in source.get("tables", []):
+            table_name = table["name"]
+            primary_key = table.get("primary_key")
+            columns = []
+
+            for col in table.get("columns", []):
+                col_def: dict = {
+                    "name": col["name"],
+                    "data_type": col["data_type"],
+                }
+                tests = col.get("tests", [])
+                if "not_null" in tests:
+                    col_def["nullable"] = False
+                else:
+                    col_def["nullable"] = True
+                if primary_key is not None and col["name"] == primary_key:
+                    col_def["primary_key"] = True
+                columns.append(col_def)
+
+            schema_dict: dict = {
+                "table_name": table_name,
+                "columns": columns,
+            }
+            if primary_key is not None:
+                schema_dict["primary_key"] = primary_key
+            schemas[table_name] = schema_dict
+
+    return schemas
+
+
 class DatabaseManager:
-    def __init__(self, db_path: str = "data/fpl_dev.duckdb"):
+    def __init__(self, db_path: str = "data/fpl_dev.duckdb", schema: str | None = None):
         self.db_path = db_path
+        self.schema = schema
         self.conn = duckdb.connect(db_path)
 
     def close(self):
         self.conn.close()
+
+    def _qualify(self, table_name: str) -> str:
+        """Return schema-qualified table name if a schema is set."""
+        if self.schema:
+            return f"{self.schema}.{table_name}"
+        return table_name
 
     def create_table(self, schema: dict, execute: bool = False, if_not_exists: bool = True) -> str:
         table_name = schema["table_name"]
@@ -88,14 +145,17 @@ class DatabaseManager:
             lines.append(fk_def)
 
         if_not_exists_clause = "IF NOT EXISTS " if if_not_exists else ""
+        qualified = self._qualify(table_name)
         query = (
-            f"CREATE TABLE {if_not_exists_clause}{table_name} (\n"
+            f"CREATE TABLE {if_not_exists_clause}{qualified} (\n"
             f"  " + ",\n  ".join(lines) + "\n"
             f");"
         )
 
         print(query)
         if execute:
+            if self.schema:
+                self.conn.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
             self.conn.execute(query)
             print(f"  -> created {table_name}")
         return query
@@ -145,8 +205,9 @@ class DatabaseManager:
         set_clause = ", ".join(f"{c} = excluded.{c}" for c in update_cols)
         pk_list = ", ".join(pk_columns)
 
+        qualified = self._qualify(table_name)
         query = (
-            f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders}) "
+            f"INSERT INTO {qualified} ({col_names}) VALUES ({placeholders}) "
             f"ON CONFLICT ({pk_list}) DO UPDATE SET {set_clause}"
         )
 

@@ -1,4 +1,4 @@
-from database_manager import DatabaseManager, map_to_duckdb_types
+from database_manager import DatabaseManager, load_table_schemas, map_to_duckdb_types
 
 
 class TestMapToDuckDBTypes:
@@ -222,6 +222,25 @@ class TestCreateTable:
         assert ("t",) in result
         db.close()
 
+    def test_schema_qualified_table_name(self):
+        db = DatabaseManager(":memory:", schema="fpl_api")
+        schema = {
+            "table_name": "players",
+            "columns": [
+                {"name": "id", "data_type": "INTEGER", "primary_key": True},
+            ],
+        }
+        import io
+        import sys
+        captured = io.StringIO()
+        sys.stdout = captured
+        db.create_table(schema)
+        sys.stdout = sys.__stdout__
+        output = captured.getvalue()
+        assert "fpl_api.players" in output
+        assert "IF NOT EXISTS" in output
+        db.close()
+
 
 class TestUpsertRows:
     def test_inserts_into_empty_table(self):
@@ -261,3 +280,75 @@ class TestUpsertRows:
         result = db.conn.execute("SELECT data FROM t WHERE id = 1").fetchone()
         assert result[0] == '{"key": "value"}'
         db.close()
+
+    def test_upsert_with_schema(self):
+        db = DatabaseManager(":memory:", schema="fpl_api")
+        db.execute_query("CREATE SCHEMA IF NOT EXISTS fpl_api")
+        db.execute_query("CREATE TABLE fpl_api.t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.upsert_rows("t", [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}], pk_columns=["id"])
+        result = db.conn.execute("SELECT COUNT(*) FROM fpl_api.t").fetchone()
+        assert result[0] == 2
+        db.close()
+
+
+class TestLoadTableSchemas:
+    def test_loads_tables_from_yaml(self, tmp_path):
+        yml = tmp_path / "datasources.yml"
+        yml.write_text("""
+version: 2
+sources:
+  - name: fpl_api
+    schema: fpl_api
+    tables:
+      - name: teams
+        primary_key: id
+        columns:
+          - name: id
+            data_type: INTEGER
+            tests: [unique, not_null]
+          - name: name
+            data_type: TEXT
+            tests: [not_null]
+          - name: form
+            data_type: TEXT
+""")
+        schemas = load_table_schemas(str(yml))
+        assert "teams" in schemas
+        teams = schemas["teams"]
+        assert teams["table_name"] == "teams"
+        assert teams["primary_key"] == "id"
+        cols = {c["name"]: c for c in teams["columns"]}
+        assert cols["id"]["data_type"] == "INTEGER"
+        assert cols["id"]["primary_key"] is True
+        assert cols["id"]["nullable"] is False
+        assert cols["name"]["data_type"] == "TEXT"
+        assert cols["name"]["nullable"] is False
+        assert cols["form"]["data_type"] == "TEXT"
+        assert cols["form"]["nullable"] is True
+
+    def test_handles_singleton_primary_key(self, tmp_path):
+        yml = tmp_path / "datasources.yml"
+        yml.write_text("""
+version: 2
+sources:
+  - name: fpl_api
+    schema: fpl_api
+    tables:
+      - name: game_settings
+        primary_key: "!singleton"
+        columns:
+          - name: league_max_team
+            data_type: INTEGER
+            tests: [not_null]
+""")
+        schemas = load_table_schemas(str(yml))
+        assert "game_settings" in schemas
+        gs = schemas["game_settings"]
+        assert gs["primary_key"] == "!singleton"
+        assert gs["columns"][0].get("primary_key") is not True
+
+    def test_missing_file_raises(self, tmp_path):
+        missing = tmp_path / "nonexistent.yml"
+        import pytest
+        with pytest.raises(FileNotFoundError):
+            load_table_schemas(str(missing))
