@@ -226,6 +226,19 @@ class DatabaseManager:
         print(f"Upserted {len(rows)} rows into {table_name}")
         return len(rows)
 
+    def fetch_column(self, table_name: str, column: str) -> list:
+        qualified = self._qualify(table_name)
+        result = self.conn.execute(f"SELECT {column} FROM {qualified} ORDER BY {column}").fetchall()
+        return [row[0] for row in result]
+
+    def table_exists(self, table_name: str) -> bool:
+        qualified = self._qualify(table_name)
+        try:
+            self.conn.execute(f"SELECT 1 FROM {qualified} LIMIT 0")
+            return True
+        except Exception:
+            return False
+
     def execute_query(self, query: str) -> None:
         try:
             self.conn.execute(query)

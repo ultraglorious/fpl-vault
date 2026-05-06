@@ -66,8 +66,12 @@ def infer_record_schema(records: list) -> list[dict]:
     return columns
 
 
-def infer_response_schema(json_data: dict) -> list[dict]:
-    """Walk top-level keys of an API response dict and produce a list of table schema dicts."""
+def infer_response_schema(json_data: dict, table_prefix: str = "") -> list[dict]:
+    """Walk top-level keys of an API response dict and produce a list of table schema dicts.
+
+    If table_prefix is provided, table names are prefixed (e.g. ``element_summary_fixtures``
+    for the ``fixtures`` key when ``table_prefix="element_summary"``).
+    """
     if not json_data:
         raise ValueError("API response is empty")
 
@@ -79,11 +83,13 @@ def infer_response_schema(json_data: dict) -> list[dict]:
                 continue
             if isinstance(value[0], dict):
                 columns = infer_record_schema(value)
-                tables.append({"table_name": key, "columns": columns})
+                table_name = f"{table_prefix}_{key}" if table_prefix else key
+                tables.append({"table_name": table_name, "columns": columns})
         elif isinstance(value, dict):
             wrapped = [value]
             columns = infer_record_schema(wrapped)
-            tables.append({"table_name": key, "columns": columns})
+            table_name = f"{table_prefix}_{key}" if table_prefix else key
+            tables.append({"table_name": table_name, "columns": columns})
 
     return tables
 

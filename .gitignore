@@ -20,4 +20,6 @@ wheels/
 
 # Database
 *.duckdb
+*.duckdb.wal
 *.bak
+data/
