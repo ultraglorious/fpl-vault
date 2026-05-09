@@ -12,7 +12,8 @@ from pipeline import log_discovery
 API_BASE = "https://fantasy.premierleague.com/api/"
 SCHEMA_YML = "datasources.yml"
 REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", "0.5"))
-MAX_IDS = int(os.getenv("MAX_IDS", "0")) or None
+_limit_ids = os.getenv("LIMIT_IDS", "").lower() in ("1", "true", "yes")
+MAX_IDS = int(os.getenv("MAX_IDS", "0")) if _limit_ids else None
 
 TABLE_KEY_MAP = {
     "game_settings": {"type": "singleton"},
