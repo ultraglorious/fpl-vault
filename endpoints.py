@@ -112,7 +112,6 @@ def _resolve_schema(table_name, inferred, yaml_schemas, endpoint):
         _validate_and_log_schema(table_name, inferred, yaml_schema, endpoint)
         return yaml_schema
     print(f"  [WARN] {table_name} not in {SCHEMA_YML} — using inferred types")
-    log_discovery(endpoint, table_name, "new_table", type="inferred")
     return map_to_duckdb_types(inferred)
 
 
@@ -176,6 +175,7 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
                 pass
 
         _append_to_datasources_yml(table_name, mapped, endpoint)
+        log_discovery(endpoint, table_name, "table_created", type="inferred")
 
 
 def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefix=""):
