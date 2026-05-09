@@ -101,12 +101,15 @@ def load_table_schemas(yml_path: str | Path) -> dict[str, dict]:
 
 
 class DatabaseManager:
+    """Open a DuckDB connection and manage table creation, upsert, and queries."""
+
     def __init__(self, db_path: str, schema: str | None = None):
         self.db_path = db_path
         self.schema = schema
         self.conn = duckdb.connect(db_path)
 
     def close(self):
+        """Close the DuckDB connection."""
         self.conn.close()
 
     def _qualify(self, table_name: str) -> str:
@@ -116,6 +119,7 @@ class DatabaseManager:
         return table_name
 
     def create_table(self, schema: dict, execute: bool = False, if_not_exists: bool = True) -> str:
+        """Generate (and optionally execute) a CREATE TABLE statement from a schema dict."""
         table_name = schema["table_name"]
         lines = []
 
@@ -162,10 +166,12 @@ class DatabaseManager:
         return query
 
     def drop_table(self, table_name: str) -> None:
+        """Drop a table if it exists."""
         self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
         print(f"Dropped {table_name} (if existed)")
 
     def insert_rows(self, table_name: str, rows: list[dict], json_columns: set[str] | None = None) -> int:
+        """Insert rows with parameterized queries. Serializes json_columns to JSON strings."""
         if not rows:
             return 0
 
@@ -192,6 +198,7 @@ class DatabaseManager:
         return len(rows)
 
     def upsert_rows(self, table_name: str, rows: list[dict], pk_columns: list[str], json_columns: set[str] | None = None) -> int:
+        """Insert or update rows using ON CONFLICT on the primary key columns."""
         if not rows:
             return 0
 
@@ -227,11 +234,13 @@ class DatabaseManager:
         return len(rows)
 
     def fetch_column(self, table_name: str, column: str) -> list:
+        """Return all values from a single column as a flat list."""
         qualified = self._qualify(table_name)
         result = self.conn.execute(f"SELECT {column} FROM {qualified} ORDER BY {column}").fetchall()
         return [row[0] for row in result]
 
     def table_exists(self, table_name: str) -> bool:
+        """Check whether a table exists in the database."""
         qualified = self._qualify(table_name)
         try:
             self.conn.execute(f"SELECT 1 FROM {qualified} LIMIT 0")
@@ -240,6 +249,7 @@ class DatabaseManager:
             return False
 
     def execute_query(self, query: str) -> None:
+        """Execute a raw SQL query against the database."""
         try:
             self.conn.execute(query)
         except Exception as e:

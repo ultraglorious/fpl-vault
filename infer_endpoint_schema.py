@@ -4,7 +4,7 @@ from api_client import APIClient
 
 
 class UnknownDataType(Exception):
-    pass
+    """Raised when a Python value doesn't map to any known type."""
 
 
 ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")

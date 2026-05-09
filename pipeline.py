@@ -12,6 +12,8 @@ from database_manager import DatabaseManager, backup_db
 
 
 class Task:
+    """A named pipeline step that calls ``func(db)``, with optional dependencies and retries."""
+
     def __init__(self, name, func, depends_on=None, retries=0, retry_delay=5):
         self.name = name
         self.func = func
@@ -21,17 +23,21 @@ class Task:
 
 
 class Pipeline:
+    """A DAG of named Tasks run in dependency order via Kahn topological sort."""
+
     def __init__(self, name=""):
         self.name = name
         self._tasks = {}
 
     def add(self, name, func=None, depends_on=None, retries=0, retry_delay=5):
+        """Register a task. Usable as ``@pipeline.add(...)`` decorator or direct call."""
         if func is None:
             return lambda f: self.add(name, f, depends_on, retries, retry_delay)
         self._tasks[name] = Task(name, func, depends_on, retries, retry_delay)
         return func
 
     def run(self, db, task_names=None):
+        """Run all tasks (or a subset) in dependency order. Returns {name: status} dict."""
         ordered = self._resolve_order(task_names)
         run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
         results = {}
@@ -133,6 +139,7 @@ def _log_dir():
 
 
 def log_pipeline_event(run_id, task, status, duration_s=None, error=None):
+    """Append a task execution event to data/pipeline_runs.jsonl."""
     entry = {
         "run_id": run_id,
         "task": task,
@@ -151,6 +158,7 @@ def log_pipeline_event(run_id, task, status, duration_s=None, error=None):
 
 
 def log_discovery(endpoint, table, event, column=None, type=None, was=None, now=None):
+    """Log a schema discovery event (new column, type change, etc.) to data/discovery.jsonl."""
     entry = {
         "time": datetime.now(timezone.utc).isoformat(),
         "endpoint": endpoint,
@@ -173,6 +181,7 @@ def log_discovery(endpoint, table, event, column=None, type=None, was=None, now=
 
 
 def build_pipeline():
+    """Build a Pipeline with all data ingestion tasks wired up with correct dependencies."""
     from endpoints import (
         ingest_bootstrap,
         ingest_dream_team,
@@ -197,6 +206,7 @@ def build_pipeline():
 
 
 def build_init_pipeline():
+    """Build a Pipeline with all schema init tasks (--init mode)."""
     from endpoints import (
         init_bootstrap,
         init_dream_team,
@@ -221,6 +231,7 @@ def build_init_pipeline():
 
 
 def main():
+    """CLI entry point. Parses --init, --live, --tasks flags and runs the pipeline."""
     load_dotenv()
 
     init_mode = "--init" in sys.argv

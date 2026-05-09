@@ -71,6 +71,7 @@ def _append_to_datasources_yml(table_name: str, mapped: dict, endpoint: str) -> 
 
 
 def _detect_pk_columns(schema: dict, table_name: str) -> list[str]:
+    """Find primary key columns from the schema or TABLE_KEY_MAP fallback."""
     pk_cols = [c["name"] for c in schema["columns"] if c.get("primary_key")]
     if pk_cols:
         return pk_cols
@@ -81,10 +82,12 @@ def _detect_pk_columns(schema: dict, table_name: str) -> list[str]:
 
 
 def _json_columns(schema: dict) -> set[str]:
+    """Return the set of column names with JSON data type."""
     return {c["name"] for c in schema["columns"] if c["data_type"] == "JSON"}
 
 
 def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict, endpoint: str) -> None:
+    """Compare inferred schema against YAML and log any drift to discovery.jsonl."""
     inferred_cols = {c["name"]: PYTHON_TO_DUCKDB.get(c["type"], c["type"]) for c in inferred["columns"]}
     yaml_cols = {c["name"]: c["data_type"] for c in yaml_schema["columns"]}
 
@@ -103,6 +106,7 @@ def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict,
 
 
 def _resolve_schema(table_name, inferred, yaml_schemas, endpoint):
+    """Return the YAML schema if available, otherwise fall back to inferred types."""
     yaml_schema = yaml_schemas.get(table_name)
     if yaml_schema:
         _validate_and_log_schema(table_name, inferred, yaml_schema, endpoint)
@@ -120,6 +124,7 @@ def _response_key(table_name: str, table_prefix: str = "") -> str:
 
 
 def _init_tables(tables, db, endpoint, extra_columns=None):
+    """Create empty tables from inferred schemas if they don't already exist."""
     yaml_schemas = load_table_schemas(SCHEMA_YML)
 
     for table in tables:
@@ -174,6 +179,7 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
 
 
 def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefix=""):
+    """Upsert API response rows into existing database tables."""
     yaml_schemas = load_table_schemas(SCHEMA_YML)
 
     for table in tables:
@@ -248,6 +254,7 @@ _client = None
 
 
 def _get_client():
+    """Return a lazily-created singleton APIClient with session reuse."""
     global _client
     if _client is None:
         _client = APIClient(base_url=API_BASE)
@@ -268,6 +275,7 @@ def _normalize_response(response, endpoint):
 # --- Init functions (--init mode) ---
 
 def init_bootstrap(db):
+    """--init: Infer schema and create tables for bootstrap-static."""
     client = _get_client()
     endpoint = "bootstrap-static"
     print(f"\nInit: {endpoint}")
@@ -277,6 +285,7 @@ def init_bootstrap(db):
 
 
 def init_simple(endpoint, db, table_prefix=None):
+    """--init: Infer schema and create tables for a simple (non-parameterized) endpoint."""
     print(f"\nInit: {endpoint}")
     response = _get_client().get(endpoint=endpoint)
     response = _normalize_response(response, endpoint)
@@ -285,6 +294,7 @@ def init_simple(endpoint, db, table_prefix=None):
 
 
 def init_event_live(db):
+    """--init: Create tables for event/{id}/live/ using a sample event."""
     endpoint_id = "event/1/live/"
     print(f"\nInit: event/{{id}}/live/ (sample: event 1)")
     response = _get_client().get(endpoint=endpoint_id)
@@ -293,6 +303,7 @@ def init_event_live(db):
 
 
 def init_dream_team(db):
+    """--init: Create tables for dream-team/{id}/ using a sample event."""
     endpoint_id = "dream-team/1/"
     print(f"\nInit: dream-team/{{id}}/ (sample: event 1)")
     response = _get_client().get(endpoint=endpoint_id)
@@ -301,6 +312,7 @@ def init_dream_team(db):
 
 
 def init_element_summary(db):
+    """--init: Create tables for element-summary/{id}/ using a sample element."""
     endpoint_id = "element-summary/1/"
     print(f"\nInit: element-summary/{{id}}/ (sample: element 1)")
     response = _get_client().get(endpoint=endpoint_id)
@@ -311,6 +323,7 @@ def init_element_summary(db):
 # --- Ingestion functions ---
 
 def ingest_bootstrap(db):
+    """Ingest bootstrap-static endpoint into the database."""
     client = _get_client()
     endpoint = "bootstrap-static"
     print(f"\nIngesting: {endpoint}")
@@ -320,6 +333,7 @@ def ingest_bootstrap(db):
 
 
 def ingest_simple(endpoint, db, table_prefix=None):
+    """Ingest a simple (non-parameterized) endpoint into the database."""
     print(f"\nIngesting: {endpoint}")
     response = _get_client().get(endpoint=endpoint)
     response = _normalize_response(response, endpoint)
@@ -328,6 +342,7 @@ def ingest_simple(endpoint, db, table_prefix=None):
 
 
 def ingest_event_live(db):
+    """Ingest event/{id}/live/ for all events (or capped by LIMIT_IDS/MAX_IDS)."""
     endpoint_label = "event/{id}/live/"
     event_ids = db.fetch_column("events", "id")
     if MAX_IDS:
@@ -348,6 +363,7 @@ def ingest_event_live(db):
 
 
 def ingest_dream_team(db):
+    """Ingest dream-team/{id}/ for all events (or capped by LIMIT_IDS/MAX_IDS)."""
     endpoint_label = "dream-team/{id}/"
     event_ids = db.fetch_column("events", "id")
     if MAX_IDS:
@@ -368,6 +384,7 @@ def ingest_dream_team(db):
 
 
 def ingest_element_summary(db):
+    """Ingest element-summary/{id}/ for all elements (or capped by LIMIT_IDS/MAX_IDS)."""
     endpoint_label = "element-summary/{id}/"
     element_ids = db.fetch_column("elements", "id")
     if MAX_IDS:
