@@ -2,8 +2,6 @@ import os
 import time
 from pathlib import Path
 
-import yaml
-
 from api_client import APIClient
 from database_manager import PYTHON_TO_DUCKDB, load_table_schemas, map_to_duckdb_types
 from infer_endpoint_schema import _python_type_name, infer_response_schema
@@ -27,13 +25,14 @@ TABLE_KEY_MAP = {
 
 
 def _append_to_datasources_yml(table_name: str, mapped: dict, endpoint: str) -> None:
-    """Add a new table stanza to datasources.yml."""
+    """Append a new table stanza to datasources.yml without reformatting existing content."""
     path = Path(SCHEMA_YML)
     if not path.exists():
         return
 
-    with open(path, "r") as f:
-        data = yaml.safe_load(f)
+    existing_text = path.read_text()
+    if f"name: {table_name}" in existing_text:
+        return
 
     pk_cols = [c["name"] for c in mapped["columns"] if c.get("primary_key")]
     primary_key = pk_cols[0] if len(pk_cols) == 1 else None
@@ -43,31 +42,28 @@ def _append_to_datasources_yml(table_name: str, mapped: dict, endpoint: str) -> 
     elif key_info and key_info["type"] == "singleton":
         primary_key = "!singleton"
 
-    columns_yaml = []
+    lines = []
+    lines.append(f"      - name: {table_name}")
+    if primary_key:
+        lines.append(f"        primary_key: {primary_key}")
+    lines.append("        columns:")
+
     for col in mapped["columns"]:
-        col_entry = {"name": col["name"], "data_type": col["data_type"]}
+        lines.append(f"          - name: {col['name']}")
+        lines.append(f"            data_type: {col['data_type']}")
         tests = []
         if not col.get("nullable", True):
             tests.append("not_null")
         if col.get("unique"):
             tests.append("unique")
-        if col.get("primary_key") and not primary_key:
-            pass
         if tests:
-            col_entry["tests"] = tests
-        columns_yaml.append(col_entry)
+            tests_str = ", ".join(tests)
+            lines.append(f"            tests: [{tests_str}]")
 
-    table_entry = {"name": table_name, "columns": columns_yaml}
-    if primary_key:
-        table_entry["primary_key"] = primary_key
-
-    source = data.get("sources", [{}])[0]
-    existing = [t["name"] for t in source.get("tables", [])]
-    if table_name not in existing:
-        source.setdefault("tables", []).append(table_entry)
-        with open(path, "w") as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-        print(f"  Added {table_name} to {SCHEMA_YML}")
+    stanza = "\n".join(lines) + "\n"
+    with open(path, "a") as f:
+        f.write(stanza)
+    print(f"  Added {table_name} to {SCHEMA_YML}")
 
 
 def _detect_pk_columns(schema: dict, table_name: str) -> list[str]:
@@ -97,7 +93,7 @@ def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict,
 
     for col in set(yaml_cols) - set(inferred_cols):
         print(f"  [DRIFT] {table_name}: column '{col}' missing from API")
-        log_discovery(endpoint, table_name, "missing_column", column=col)
+        log_discovery(endpoint, table_name, "missing_column", column=col, type=yaml_cols[col])
 
     for name in set(inferred_cols) & set(yaml_cols):
         if inferred_cols[name] != yaml_cols[name]:
@@ -175,7 +171,7 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
                 pass
 
         _append_to_datasources_yml(table_name, mapped, endpoint)
-        log_discovery(endpoint, table_name, "table_created", type="inferred")
+        log_discovery(endpoint, table_name, "table_created")
 
 
 def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefix=""):
