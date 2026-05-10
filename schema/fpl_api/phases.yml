@@ -1,0 +1,24 @@
+name: phases
+primary_key: id
+columns:
+- name: id
+  data_type: INTEGER
+  tests:
+  - not_null
+  - unique
+- name: name
+  data_type: TEXT
+  tests:
+  - not_null
+- name: start_event
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: stop_event
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: highest_score
+  data_type: INTEGER
+  tests:
+  - not_null

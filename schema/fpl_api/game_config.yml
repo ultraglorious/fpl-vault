@@ -1,0 +1,15 @@
+name: game_config
+primary_key: '!singleton'
+columns:
+- name: settings
+  data_type: JSON
+  tests:
+  - not_null
+- name: rules
+  data_type: JSON
+  tests:
+  - not_null
+- name: scoring
+  data_type: JSON
+  tests:
+  - not_null

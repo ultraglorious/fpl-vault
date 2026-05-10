@@ -65,6 +65,8 @@ def _parse_table_yaml(data: dict) -> dict:
         }
         tests = col.get("tests", [])
         col_def["nullable"] = "not_null" not in tests
+        if "unique" in tests:
+            col_def["unique"] = True
         if primary_key is not None and col["name"] == primary_key:
             col_def["primary_key"] = True
         columns.append(col_def)

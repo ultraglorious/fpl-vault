@@ -1,0 +1,84 @@
+name: teams
+primary_key: id
+columns:
+- name: code
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: draw
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: form
+  data_type: TEXT
+- name: id
+  data_type: INTEGER
+  tests:
+  - not_null
+  - unique
+- name: loss
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: name
+  data_type: TEXT
+  tests:
+  - not_null
+- name: played
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: points
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: position
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: short_name
+  data_type: TEXT
+  tests:
+  - not_null
+- name: strength
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: team_division
+  data_type: TEXT
+- name: unavailable
+  data_type: BOOLEAN
+  tests:
+  - not_null
+- name: win
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_overall_home
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_overall_away
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_attack_home
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_attack_away
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_defence_home
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: strength_defence_away
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: pulse_id
+  data_type: INTEGER
+  tests:
+  - not_null
