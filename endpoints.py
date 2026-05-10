@@ -5,7 +5,7 @@ from pathlib import Path
 from api_client import APIClient
 from database_manager import PYTHON_TO_DUCKDB, load_table_schemas, map_to_duckdb_types
 from infer_endpoint_schema import _python_type_name, infer_response_schema
-from pipeline import log_discovery
+from pipeline import log_discovery, update_task_progress
 
 API_BASE = "https://fantasy.premierleague.com/api/"
 SCHEMA_YML = "datasources.yml"
@@ -354,6 +354,7 @@ def ingest_event_live(db):
         response = client.get(endpoint=f"event/{eid}/live/")
         tables = infer_response_schema(response, table_prefix="event_live")
         _ingest_rows(tables, response, db, endpoint_label, extra_columns={"event_id": eid}, table_prefix="event_live")
+        update_task_progress("event-live", i + 1, len(event_ids))
 
     print(f"  {len(event_ids)}/{len(event_ids)} done")
 
@@ -375,6 +376,7 @@ def ingest_dream_team(db):
         response = client.get(endpoint=f"dream-team/{eid}/")
         tables = infer_response_schema(response, table_prefix="dream_team")
         _ingest_rows(tables, response, db, endpoint_label, extra_columns={"event_id": eid}, table_prefix="dream_team")
+        update_task_progress("dream-team", i + 1, len(event_ids))
 
     print(f"  {len(event_ids)}/{len(event_ids)} done")
 
@@ -396,5 +398,6 @@ def ingest_element_summary(db):
         response = client.get(endpoint=f"element-summary/{eid}/")
         tables = infer_response_schema(response, table_prefix="element_summary")
         _ingest_rows(tables, response, db, endpoint_label, extra_columns={"element_id": eid}, table_prefix="element_summary")
+        update_task_progress("element-summary", i + 1, len(element_ids))
 
     print(f"  {len(element_ids)}/{len(element_ids)} done")

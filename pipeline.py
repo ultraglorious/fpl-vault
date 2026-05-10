@@ -28,6 +28,9 @@ class Pipeline:
     def __init__(self, name=""):
         self.name = name
         self._tasks = {}
+        self._run_id = None
+        self._started_at = None
+        self._task_states = {}
 
     def add(self, name, func=None, depends_on=None, retries=0, retry_delay=5):
         """Register a task. Usable as ``@pipeline.add(...)`` decorator or direct call."""
@@ -39,10 +42,15 @@ class Pipeline:
     def run(self, db, task_names=None):
         """Run all tasks (or a subset) in dependency order. Returns {name: status} dict."""
         ordered = self._resolve_order(task_names)
-        run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
+        self._run_id = datetime.now().strftime("%Y%m%dT%H%M%S")
+        self._started_at = datetime.now(timezone.utc).isoformat()
         results = {}
 
-        print(f"\nPipeline run: {run_id}")
+        self._task_states = {name: {"status": "pending"} for name in ordered}
+        _set_active_pipeline(self)
+        self._write_progress_file()
+
+        print(f"\nPipeline run: {self._run_id}")
         print(f"Tasks: {', '.join(ordered)}")
 
         for name in ordered:
@@ -52,9 +60,14 @@ class Pipeline:
             if dep_failed:
                 print(f"  [SKIP] {name}: dependency '{dep_failed}' failed")
                 results[name] = "skipped"
+                self._task_states[name]["status"] = "skipped"
+                self._write_progress_file()
                 continue
 
-            log_pipeline_event(run_id, task.name, "started")
+            self._task_states[name]["status"] = "running"
+            self._write_progress_file()
+
+            log_pipeline_event(self._run_id, task.name, "started")
             started = time.time()
             try:
                 for attempt in range(task.retries + 1):
@@ -68,17 +81,36 @@ class Pipeline:
                         else:
                             raise
                 duration = round(time.time() - started, 1)
-                log_pipeline_event(run_id, task.name, "success", duration_s=duration)
+                log_pipeline_event(self._run_id, task.name, "success", duration_s=duration)
                 results[name] = "success"
+                self._task_states[name] = {"status": "success", "elapsed_s": duration}
                 print(f"  [OK] {name} ({duration}s)")
             except Exception as e:
                 duration = round(time.time() - started, 1)
-                log_pipeline_event(run_id, task.name, "failed", duration_s=duration, error=str(e))
+                log_pipeline_event(self._run_id, task.name, "failed", duration_s=duration, error=str(e))
                 results[name] = "failed"
+                self._task_states[name] = {"status": "failed", "elapsed_s": duration, "error": str(e)}
                 print(f"  [FAILED] {name}: {e}")
 
+            self._write_progress_file()
+
+        _set_active_pipeline(None)
         self._print_summary(results)
         return results
+
+    def _write_progress_file(self):
+        log_dir = _log_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        data = {
+            "run_id": self._run_id,
+            "started_at": self._started_at,
+            "tasks": self._task_states,
+        }
+        tmp_path = log_dir / "pipeline_progress.json.tmp"
+        final_path = log_dir / "pipeline_progress.json"
+        with open(tmp_path, "w") as f:
+            json.dump(data, f, indent=2, default=str)
+        tmp_path.replace(final_path)
 
     def _resolve_order(self, task_names=None):
         names = task_names or list(self._tasks.keys())
@@ -178,6 +210,27 @@ def log_discovery(endpoint, table, event, column=None, type=None, was=None, now=
     log_dir.mkdir(parents=True, exist_ok=True)
     with open(log_dir / "discovery.jsonl", "a") as f:
         f.write(json.dumps(entry) + "\n")
+
+
+_active_pipeline = None
+
+
+def _set_active_pipeline(p):
+    global _active_pipeline
+    _active_pipeline = p
+
+
+def update_task_progress(task_name, current, total):
+    """Called by long-running tasks to report iteration progress."""
+    p = _active_pipeline
+    if p is None:
+        return
+    state = p._task_states.get(task_name)
+    if state:
+        state["current"] = current
+        state["total"] = total
+        state["pct"] = round(current / total * 100, 1)
+        p._write_progress_file()
 
 
 def build_pipeline():
