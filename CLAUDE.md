@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Context
+
+This is a learning project. The author is comfortable with Python but uses this codebase to explore best practices — testing, architecture, CLI design, schema management. Claude should treat this as a teaching opportunity: explain the *why* behind recommendations, point out patterns worth internalizing, and flag anti-patterns when they appear. The author should not have to spend time deducing what a piece of code does or why it exists — names, structure, and (where necessary) comments should make intent obvious.
+
 ## Commands
 
 ```
@@ -21,6 +25,8 @@ uv run python pipeline.py --init --tasks event-live     # Init a single paramete
 
 - **Never** add Co-Authored-By, Signed-off-by, or similar trailer lines to git commits.
 - **Never** `cd` to the current working directory in bash commands. The shell starts in the project root — just run the command directly.
+- **Always** write tests for new or changed functionality. If you add a function, test it. If you touch a module with no coverage, create the test file. Run the full suite after any change — 100% pass is expected.
+- **Commit each independent change separately.** After completing one logical task (bug fix, refactor, new feature), stage and commit it before starting the next. Never bundle unrelated work into a single commit. Offer to commit after each completed batch of changes — don't wait for the author to ask.
 
 ## Configuration
 
@@ -79,4 +85,4 @@ columns:
 
 ### Tests
 
-83 tests in 4 files with 100% pass rate. `conftest.py` isolates tests from the real filesystem by redirecting `SCHEMA_DIR` to a temp directory via `pytest_configure`.
+119 tests in 5 files with 100% pass rate. `conftest.py` isolates tests from the real filesystem by redirecting `SCHEMA_DIR` to a temp directory via `pytest_configure`.
