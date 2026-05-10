@@ -306,3 +306,37 @@ class TestUpdateTaskProgress:
 
         _set_active_pipeline(None)
         db.close()
+
+    def test_current_id_written_to_state_and_file(self, tmp_path):
+        os.environ["DATA_DIR"] = str(tmp_path)
+        p = Pipeline()
+        p.add("a", func=lambda db: None)
+        db = DatabaseManager(":memory:")
+
+        p._run_id = "test"
+        p._started_at = "2025-01-01T00:00:00Z"
+        p._task_states = {"a": {"status": "running"}}
+        _set_active_pipeline(p)
+
+        update_task_progress("a", 5, 20, current_id=37)
+        assert p._task_states["a"]["current_id"] == 37
+
+        progress_file = tmp_path / "pipeline_progress.json"
+        data = json.loads(progress_file.read_text())
+        assert data["tasks"]["a"]["current_id"] == 37
+
+        _set_active_pipeline(None)
+        db.close()
+
+    def test_current_id_not_set_when_none(self, tmp_path):
+        os.environ["DATA_DIR"] = str(tmp_path)
+        p = Pipeline()
+        p._run_id = "test"
+        p._started_at = "2025-01-01T00:00:00Z"
+        p._task_states = {"a": {"status": "running"}}
+        _set_active_pipeline(p)
+
+        update_task_progress("a", 1, 10)
+        assert "current_id" not in p._task_states["a"]
+
+        _set_active_pipeline(None)

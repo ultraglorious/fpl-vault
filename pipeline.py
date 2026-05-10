@@ -83,13 +83,16 @@ class Pipeline:
                 duration = round(time.time() - started, 1)
                 log_pipeline_event(self._run_id, task.name, "success", duration_s=duration)
                 results[name] = "success"
-                self._task_states[name] = {"status": "success", "elapsed_s": duration}
+                self._task_states[name]["status"] = "success"
+                self._task_states[name]["elapsed_s"] = duration
                 print(f"  [OK] {name} ({duration}s)")
             except Exception as e:
                 duration = round(time.time() - started, 1)
                 log_pipeline_event(self._run_id, task.name, "failed", duration_s=duration, error=str(e))
                 results[name] = "failed"
-                self._task_states[name] = {"status": "failed", "elapsed_s": duration, "error": str(e)}
+                self._task_states[name]["status"] = "failed"
+                self._task_states[name]["elapsed_s"] = duration
+                self._task_states[name]["error"] = str(e)
                 print(f"  [FAILED] {name}: {e}")
 
             self._write_progress_file()
@@ -106,11 +109,9 @@ class Pipeline:
             "started_at": self._started_at,
             "tasks": self._task_states,
         }
-        tmp_path = log_dir / "pipeline_progress.json.tmp"
         final_path = log_dir / "pipeline_progress.json"
-        with open(tmp_path, "w") as f:
+        with open(final_path, "w") as f:
             json.dump(data, f, indent=2, default=str)
-        tmp_path.replace(final_path)
 
     def _resolve_order(self, task_names=None):
         names = task_names or list(self._tasks.keys())
@@ -220,7 +221,7 @@ def _set_active_pipeline(p):
     _active_pipeline = p
 
 
-def update_task_progress(task_name, current, total):
+def update_task_progress(task_name, current, total, current_id=None):
     """Called by long-running tasks to report iteration progress."""
     p = _active_pipeline
     if p is None:
@@ -230,7 +231,11 @@ def update_task_progress(task_name, current, total):
         state["current"] = current
         state["total"] = total
         state["pct"] = round(current / total * 100, 1)
+        if current_id is not None:
+            state["current_id"] = current_id
         p._write_progress_file()
+    else:
+        print(f"[DEBUG] update_task_progress({task_name!r}): state not found, keys={list(p._task_states.keys())}", file=sys.stderr, flush=True)
 
 
 def build_pipeline():
@@ -316,4 +321,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if "pipeline" not in sys.modules:
+        sys.modules["pipeline"] = sys.modules["__main__"]
     main()
