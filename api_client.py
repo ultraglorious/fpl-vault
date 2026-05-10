@@ -33,7 +33,3 @@ class APIClient:
         response = self._request_with_retry("GET", f"{self.base_url}{endpoint}", params=params, headers=headers)
         return response.json()
 
-    def post(self, endpoint: str, json_data: dict, headers=None) -> dict:
-        response = self._request_with_retry("POST", f"{self.base_url}{endpoint}", json=json_data, headers=headers)
-        return response.json()
-

@@ -1,6 +1,5 @@
 import os
 import time
-from pathlib import Path
 
 from api_client import APIClient
 from database_manager import PYTHON_TO_DUCKDB, load_table_schemas, map_to_duckdb_types, save_table_schema

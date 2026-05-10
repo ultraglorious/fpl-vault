@@ -195,38 +195,6 @@ class DatabaseManager:
             print(f"  -> created {table_name}")
         return query
 
-    def drop_table(self, table_name: str) -> None:
-        """Drop a table if it exists."""
-        self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-        print(f"Dropped {table_name} (if existed)")
-
-    def insert_rows(self, table_name: str, rows: list[dict], json_columns: set[str] | None = None) -> int:
-        """Insert rows with parameterized queries. Serializes json_columns to JSON strings."""
-        if not rows:
-            return 0
-
-        if json_columns is None:
-            json_columns = set()
-
-        columns = list(rows[0].keys())
-        placeholders = ", ".join(["?"] * len(columns))
-        col_names = ", ".join(columns)
-        query = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders})"
-
-        values = []
-        for row in rows:
-            value_row = []
-            for col in columns:
-                val = row[col]
-                if col in json_columns and isinstance(val, (dict, list)):
-                    val = json.dumps(val)
-                value_row.append(val)
-            values.append(tuple(value_row))
-
-        self.conn.executemany(query, values)
-        print(f"Inserted {len(rows)} rows into {table_name}")
-        return len(rows)
-
     def upsert_rows(self, table_name: str, rows: list[dict], pk_columns: list[str], json_columns: set[str] | None = None) -> int:
         """Insert or update rows using ON CONFLICT on the primary key columns."""
         if not rows:
