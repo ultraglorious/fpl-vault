@@ -1,7 +1,11 @@
-from database_manager import DatabaseManager, load_table_schemas, map_to_duckdb_types
+import os
+
+from database_manager import DatabaseManager, load_table_schemas, map_to_duckdb_types, save_table_schema, backup_db
 
 
 class TestMapToDuckDBTypes:
+    """Python-to-DuckDB type mapping and primary key inference."""
+
     def test_type_conversion(self):
         schema = {
             "table_name": "players",
@@ -71,6 +75,8 @@ class TestMapToDuckDBTypes:
 
 
 class TestCreateTable:
+    """CREATE TABLE DDL generation and execution."""
+
     def test_simple_table(self):
         db = DatabaseManager(":memory:")
         schema = {
@@ -83,7 +89,7 @@ class TestCreateTable:
         db.create_table(schema)
         db.close()
 
-    def test_has_comma_separators(self):
+    def test_has_comma_separators(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -93,17 +99,12 @@ class TestCreateTable:
                 {"name": "c", "data_type": "BOOLEAN"},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert ",\n" in output
         db.close()
 
-    def test_primary_key_inline(self):
+    def test_primary_key_inline(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -111,17 +112,12 @@ class TestCreateTable:
                 {"name": "id", "data_type": "INTEGER", "primary_key": True},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "PRIMARY KEY" in output
         db.close()
 
-    def test_foreign_key_syntax(self):
+    def test_foreign_key_syntax(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -133,17 +129,12 @@ class TestCreateTable:
                 {"column_name": "team_id", "referenced_table": "teams", "referenced_column": "id"}
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "FOREIGN KEY (team_id) REFERENCES teams(id)" in output
         db.close()
 
-    def test_not_null_in_output(self):
+    def test_not_null_in_output(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -151,17 +142,12 @@ class TestCreateTable:
                 {"name": "name", "data_type": "TEXT", "nullable": False},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "NOT NULL" in output
         db.close()
 
-    def test_creates_valid_sql_with_semicolon(self):
+    def test_creates_valid_sql_with_semicolon(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -169,17 +155,12 @@ class TestCreateTable:
                 {"name": "id", "data_type": "INTEGER", "primary_key": True},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert output.strip().endswith(";")
         db.close()
 
-    def test_unique_constraint(self):
+    def test_unique_constraint(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -187,17 +168,12 @@ class TestCreateTable:
                 {"name": "name", "data_type": "TEXT", "unique": True},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "UNIQUE" in output
         db.close()
 
-    def test_if_not_exists_default(self):
+    def test_if_not_exists_default(self, capsys):
         db = DatabaseManager(":memory:")
         schema = {
             "table_name": "t",
@@ -205,13 +181,8 @@ class TestCreateTable:
                 {"name": "id", "data_type": "INTEGER", "primary_key": True},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "IF NOT EXISTS" in output
         db.close()
 
@@ -222,7 +193,7 @@ class TestCreateTable:
         assert ("t",) in result
         db.close()
 
-    def test_schema_qualified_table_name(self):
+    def test_schema_qualified_table_name(self, capsys):
         db = DatabaseManager(":memory:", schema="fpl_api")
         schema = {
             "table_name": "players",
@@ -230,19 +201,16 @@ class TestCreateTable:
                 {"name": "id", "data_type": "INTEGER", "primary_key": True},
             ],
         }
-        import io
-        import sys
-        captured = io.StringIO()
-        sys.stdout = captured
         db.create_table(schema)
-        sys.stdout = sys.__stdout__
-        output = captured.getvalue()
+        output = capsys.readouterr().out
         assert "fpl_api.players" in output
         assert "IF NOT EXISTS" in output
         db.close()
 
 
 class TestUpsertRows:
+    """INSERT ON CONFLICT DO UPDATE upsert logic."""
+
     def test_inserts_into_empty_table(self):
         db = DatabaseManager(":memory:")
         db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
@@ -292,6 +260,8 @@ class TestUpsertRows:
 
 
 class TestLoadTableSchemas:
+    """Loading per-table YAML schema files from a directory."""
+
     def test_loads_tables_from_yaml(self, tmp_path):
         yml = tmp_path / "teams.yml"
         yml.write_text("""
@@ -349,6 +319,8 @@ columns:
 
 
 class TestSaveTableSchema:
+    """Writing mapped schemas back to YAML files."""
+
     def test_writes_and_roundtrips(self, tmp_path):
         mapped = {
             "table_name": "teams",
@@ -359,7 +331,6 @@ class TestSaveTableSchema:
                 {"name": "form", "data_type": "TEXT", "nullable": True},
             ],
         }
-        from database_manager import save_table_schema
         save_table_schema(str(tmp_path), mapped)
 
         yml_file = tmp_path / "teams.yml"
@@ -379,6 +350,72 @@ class TestSaveTableSchema:
     def test_creates_directory(self, tmp_path):
         schema_dir = tmp_path / "new_schema"
         mapped = {"table_name": "t", "columns": [{"name": "id", "data_type": "INTEGER", "nullable": False}]}
-        from database_manager import save_table_schema
         save_table_schema(str(schema_dir), mapped)
         assert (schema_dir / "t.yml").exists()
+
+
+class TestBackupDb:
+    """Database file backup with timestamped copies."""
+
+    def test_creates_timestamped_backup(self, tmp_path):
+        db_path = tmp_path / "test.duckdb"
+        db_path.write_text("mock database content")
+        result = backup_db(str(db_path), backup_dir=str(tmp_path))
+        assert result is not None
+        backups = list(tmp_path.glob("*.bak"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == "mock database content"
+
+    def test_returns_none_when_source_does_not_exist(self):
+        result = backup_db("/nonexistent/path/db.duckdb")
+        assert result is None
+
+    def test_uses_default_backup_dir(self, tmp_path):
+        db_path = tmp_path / "test.duckdb"
+        db_path.write_text("data")
+        os.environ["DATA_DIR"] = str(tmp_path)
+        result = backup_db(str(db_path))
+        assert result is not None
+        backup_dir = tmp_path / "backups"
+        assert backup_dir.exists()
+        backups = list(backup_dir.glob("*.bak"))
+        assert len(backups) == 1
+
+
+class TestFetchColumn:
+    """Single-column value extraction as a flat list."""
+
+    def test_returns_flat_ordered_list(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.execute_query("INSERT INTO t VALUES (2, 'b'), (1, 'a'), (3, 'c')")
+        result = db.fetch_column("t", "id")
+        assert result == [1, 2, 3]
+        db.close()
+
+    def test_empty_table_returns_empty_list(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        result = db.fetch_column("t", "id")
+        assert result == []
+        db.close()
+
+    def test_schema_qualified_table(self):
+        db = DatabaseManager(":memory:", schema="fpl_api")
+        db.execute_query("CREATE SCHEMA IF NOT EXISTS fpl_api")
+        db.execute_query("CREATE TABLE fpl_api.t (id INTEGER PRIMARY KEY, name TEXT)")
+        db.execute_query("INSERT INTO fpl_api.t VALUES (1, 'a')")
+        result = db.fetch_column("t", "name")
+        assert result == ["a"]
+        db.close()
+
+
+class TestUpsertRowsEdgeCases:
+    """Edge cases not covered by TestUpsertRows."""
+
+    def test_empty_rows_returns_zero(self):
+        db = DatabaseManager(":memory:")
+        db.execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)")
+        count = db.upsert_rows("t", [], pk_columns=["id"])
+        assert count == 0
+        db.close()

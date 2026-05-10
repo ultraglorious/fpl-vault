@@ -8,6 +8,8 @@ from infer_endpoint_schema import (
 
 
 class TestPythonTypeName:
+    """Mapping Python runtime values to type name strings."""
+
     def test_none_returns_none(self):
         assert _python_type_name(None) is None
 
@@ -45,6 +47,8 @@ class TestPythonTypeName:
 
 
 class TestInferRecordSchema:
+    """Extracting column definitions from a list of record dicts."""
+
     def test_happy_path(self):
         records = [{"id": 1, "name": "Salah", "active": True, "score": 8.5}]
         columns = infer_record_schema(records)
@@ -85,6 +89,8 @@ class TestInferRecordSchema:
 
 
 class TestInferResponseSchema:
+    """Walking API response dicts to discover table schemas."""
+
     def test_empty_dict_raises(self):
         with pytest.raises(ValueError, match="API response is empty"):
             infer_response_schema({})

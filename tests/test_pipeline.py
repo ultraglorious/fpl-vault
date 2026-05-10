@@ -1,9 +1,21 @@
+import json
+import os
+
 import pytest
 from database_manager import DatabaseManager
-from pipeline import Pipeline, Task, log_pipeline_event, log_discovery
+from pipeline import (
+    Pipeline,
+    Task,
+    _set_active_pipeline,
+    log_discovery,
+    log_pipeline_event,
+    update_task_progress,
+)
 
 
 class TestTask:
+    """Task dataclass: name, function, dependencies, retries."""
+
     def test_creates_task(self):
         def noop(db):
             pass
@@ -23,6 +35,8 @@ class TestTask:
 
 
 class TestPipelineAdd:
+    """Task registration via direct call and decorator."""
+
     def test_direct_add(self):
         p = Pipeline()
         p.add("a", func=lambda db: None)
@@ -40,6 +54,8 @@ class TestPipelineAdd:
 
 
 class TestPipelineResolveOrder:
+    """Kahn topological sort: ordering, filtering, cycle detection."""
+
     def test_single_task(self):
         p = Pipeline()
         p.add("a", func=lambda db: None)
@@ -106,6 +122,8 @@ class TestPipelineResolveOrder:
 
 
 class TestPipelineRun:
+    """End-to-end pipeline execution: ordering, failures, retries."""
+
     def test_executes_tasks_in_order(self):
         p = Pipeline()
         executed = []
@@ -182,26 +200,24 @@ class TestPipelineRun:
 
 
 class TestLogPipelineEvent:
+    """JSONL logging of pipeline task execution events."""
+
     def test_writes_jsonl_line(self, tmp_path):
-        import os
         os.environ["DATA_DIR"] = str(tmp_path)
         log_pipeline_event("run1", "task_a", "started")
         log_path = tmp_path / "pipeline_runs.jsonl"
         assert log_path.exists()
         lines = log_path.read_text().strip().split("\n")
         assert len(lines) == 1
-        import json
         entry = json.loads(lines[0])
         assert entry["run_id"] == "run1"
         assert entry["task"] == "task_a"
         assert entry["status"] == "started"
 
     def test_writes_error(self, tmp_path):
-        import os
         os.environ["DATA_DIR"] = str(tmp_path)
         log_pipeline_event("run2", "task_b", "failed", duration_s=1.5, error="connection refused")
         log_path = tmp_path / "pipeline_runs.jsonl"
-        import json
         entry = json.loads(log_path.read_text().strip())
         assert entry["status"] == "failed"
         assert entry["duration_s"] == 1.5
@@ -209,12 +225,12 @@ class TestLogPipelineEvent:
 
 
 class TestLogDiscovery:
+    """Schema discovery event logging."""
+
     def test_writes_new_column_event(self, tmp_path):
-        import os
         os.environ["DATA_DIR"] = str(tmp_path)
         log_discovery("fixtures", "fixtures", "new_column", column="var_assists", type="INTEGER")
         log_path = tmp_path / "discovery.jsonl"
-        import json
         entry = json.loads(log_path.read_text().strip())
         assert entry["endpoint"] == "fixtures"
         assert entry["table"] == "fixtures"
@@ -223,12 +239,70 @@ class TestLogDiscovery:
         assert entry["type"] == "INTEGER"
 
     def test_writes_type_change_event(self, tmp_path):
-        import os
         os.environ["DATA_DIR"] = str(tmp_path)
         log_discovery("bootstrap-static", "elements", "type_change", column="starts", was="INTEGER", now="TEXT")
         log_path = tmp_path / "discovery.jsonl"
-        import json
         entry = json.loads(log_path.read_text().strip())
         assert entry["event"] == "type_change"
         assert entry["was"] == "INTEGER"
         assert entry["now"] == "TEXT"
+
+
+class TestUpdateTaskProgress:
+    """Progress reporting for long-running parameterized tasks."""
+
+    def test_updates_progress_and_percentage(self, tmp_path):
+        os.environ["DATA_DIR"] = str(tmp_path)
+        p = Pipeline()
+        p.add("a", func=lambda db: None)
+        db = DatabaseManager(":memory:")
+
+        p._run_id = "test"
+        p._started_at = "2025-01-01T00:00:00Z"
+        p._task_states = {"a": {"status": "running"}}
+        _set_active_pipeline(p)
+
+        update_task_progress("a", 5, 20)
+        assert p._task_states["a"]["current"] == 5
+        assert p._task_states["a"]["total"] == 20
+        assert p._task_states["a"]["pct"] == 25.0
+
+        _set_active_pipeline(None)
+        db.close()
+
+    def test_noop_when_no_active_pipeline(self):
+        _set_active_pipeline(None)
+        update_task_progress("x", 1, 10)
+
+    def test_noop_when_task_not_in_state(self, tmp_path):
+        os.environ["DATA_DIR"] = str(tmp_path)
+        p = Pipeline()
+        p._run_id = "test"
+        p._started_at = "2025-01-01T00:00:00Z"
+        p._task_states = {}
+        _set_active_pipeline(p)
+
+        update_task_progress("nonexistent", 1, 10)
+        _set_active_pipeline(None)
+
+    def test_writes_progress_file(self, tmp_path):
+        os.environ["DATA_DIR"] = str(tmp_path)
+        p = Pipeline()
+        p.add("a", func=lambda db: None)
+        db = DatabaseManager(":memory:")
+
+        p._run_id = "test"
+        p._started_at = "2025-01-01T00:00:00Z"
+        p._task_states = {"a": {"status": "running"}}
+        _set_active_pipeline(p)
+
+        update_task_progress("a", 5, 20)
+        progress_file = tmp_path / "pipeline_progress.json"
+        assert progress_file.exists()
+        data = json.loads(progress_file.read_text())
+        assert data["run_id"] == "test"
+        assert data["tasks"]["a"]["current"] == 5
+        assert data["tasks"]["a"]["pct"] == 25.0
+
+        _set_active_pipeline(None)
+        db.close()
