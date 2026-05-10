@@ -1,9 +1,39 @@
 name: fixtures
 primary_key: id
 columns:
+- name: code
+  data_type: INTEGER
+- name: event
+  data_type: INTEGER
+- name: finished
+  data_type: BOOLEAN
+- name: finished_provisional
+  data_type: BOOLEAN
 - name: id
   data_type: INTEGER
   tests:
   - not_null
-- name: name
-  data_type: TEXT
+- name: kickoff_time
+  data_type: TIMESTAMP
+- name: minutes
+  data_type: INTEGER
+- name: provisional_start_time
+  data_type: BOOLEAN
+- name: started
+  data_type: BOOLEAN
+- name: team_a
+  data_type: INTEGER
+- name: team_a_score
+  data_type: INTEGER
+- name: team_h
+  data_type: INTEGER
+- name: team_h_score
+  data_type: INTEGER
+- name: stats
+  data_type: JSON
+- name: team_h_difficulty
+  data_type: INTEGER
+- name: team_a_difficulty
+  data_type: INTEGER
+- name: pulse_id
+  data_type: INTEGER

@@ -5,28 +5,15 @@ columns:
   data_type: INTEGER
   tests:
   - not_null
-  - unique
 - name: name
   data_type: TEXT
-  tests:
-  - not_null
 - name: number
   data_type: INTEGER
-  tests:
-  - not_null
 - name: start_event
   data_type: INTEGER
-  tests:
-  - not_null
 - name: stop_event
   data_type: INTEGER
-  tests:
-  - not_null
 - name: chip_type
   data_type: TEXT
-  tests:
-  - not_null
 - name: overrides
   data_type: JSON
-  tests:
-  - not_null

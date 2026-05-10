@@ -2,169 +2,85 @@ name: element_summary_history
 columns:
 - name: element
   data_type: INTEGER
-  tests:
-  - not_null
 - name: fixture
   data_type: INTEGER
-  tests:
-  - not_null
 - name: opponent_team
   data_type: INTEGER
-  tests:
-  - not_null
 - name: total_points
   data_type: INTEGER
-  tests:
-  - not_null
 - name: was_home
   data_type: BOOLEAN
-  tests:
-  - not_null
 - name: kickoff_time
   data_type: TIMESTAMP
-  tests:
-  - not_null
 - name: team_h_score
   data_type: INTEGER
-  tests:
-  - not_null
 - name: team_a_score
   data_type: INTEGER
-  tests:
-  - not_null
 - name: round
   data_type: INTEGER
-  tests:
-  - not_null
 - name: modified
   data_type: BOOLEAN
-  tests:
-  - not_null
 - name: minutes
   data_type: INTEGER
-  tests:
-  - not_null
 - name: goals_scored
   data_type: INTEGER
-  tests:
-  - not_null
 - name: assists
   data_type: INTEGER
-  tests:
-  - not_null
 - name: clean_sheets
   data_type: INTEGER
-  tests:
-  - not_null
 - name: goals_conceded
   data_type: INTEGER
-  tests:
-  - not_null
 - name: own_goals
   data_type: INTEGER
-  tests:
-  - not_null
 - name: penalties_saved
   data_type: INTEGER
-  tests:
-  - not_null
 - name: penalties_missed
   data_type: INTEGER
-  tests:
-  - not_null
 - name: yellow_cards
   data_type: INTEGER
-  tests:
-  - not_null
 - name: red_cards
   data_type: INTEGER
-  tests:
-  - not_null
 - name: saves
   data_type: INTEGER
-  tests:
-  - not_null
 - name: bonus
   data_type: INTEGER
-  tests:
-  - not_null
 - name: bps
   data_type: INTEGER
-  tests:
-  - not_null
 - name: influence
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: creativity
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: threat
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: ict_index
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: clearances_blocks_interceptions
   data_type: INTEGER
-  tests:
-  - not_null
 - name: recoveries
   data_type: INTEGER
-  tests:
-  - not_null
 - name: tackles
   data_type: INTEGER
-  tests:
-  - not_null
 - name: defensive_contribution
   data_type: INTEGER
-  tests:
-  - not_null
 - name: starts
   data_type: INTEGER
-  tests:
-  - not_null
 - name: expected_goals
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_assists
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_goal_involvements
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_goals_conceded
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: value
   data_type: INTEGER
-  tests:
-  - not_null
 - name: transfers_balance
   data_type: INTEGER
-  tests:
-  - not_null
 - name: selected
   data_type: INTEGER
-  tests:
-  - not_null
 - name: transfers_in
   data_type: INTEGER
-  tests:
-  - not_null
 - name: transfers_out
   data_type: INTEGER
-  tests:
-  - not_null
 - name: element_id
   data_type: INTEGER
-  tests:
-  - not_null

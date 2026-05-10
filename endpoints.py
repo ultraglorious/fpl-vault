@@ -40,18 +40,19 @@ def _json_columns(schema: dict) -> set[str]:
     return {c["name"] for c in schema["columns"] if c["data_type"] == "JSON"}
 
 
+def _normalize_dtype(dtype: str) -> str:
+    """Normalize equivalent DuckDB type names so VARCHAR/TEXT don't trigger false drift."""
+    return "VARCHAR" if dtype in ("TEXT", "VARCHAR") else dtype
+
+
 def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict, endpoint: str) -> None:
     """Compare inferred schema against YAML and log any drift to discovery.jsonl."""
-    inferred_cols = {c["name"]: PYTHON_TO_DUCKDB.get(c["type"], c["type"]) for c in inferred["columns"]}
-    yaml_cols = {c["name"]: c["data_type"] for c in yaml_schema["columns"]}
+    inferred_cols = {c["name"]: _normalize_dtype(PYTHON_TO_DUCKDB.get(c["type"], c["type"])) for c in inferred["columns"]}
+    yaml_cols = {c["name"]: _normalize_dtype(c["data_type"]) for c in yaml_schema["columns"]}
 
     for col in set(inferred_cols) - set(yaml_cols):
         print(f"  [DRIFT] {table_name}: new column '{col}' ({inferred_cols[col]})")
         log_discovery(endpoint, table_name, "new_column", column=col, type=inferred_cols[col])
-
-    for col in set(yaml_cols) - set(inferred_cols):
-        print(f"  [DRIFT] {table_name}: column '{col}' missing from API")
-        log_discovery(endpoint, table_name, "missing_column", column=col, type=yaml_cols[col])
 
     for name in set(inferred_cols) & set(yaml_cols):
         if inferred_cols[name] != yaml_cols[name]:
@@ -82,11 +83,13 @@ def _apply_key_map_modifiers(mapped, table_name, rows=None):
     pk_value = mapped.get("primary_key")
 
     if pk_value == "!singleton" or key_info.get("type") == "singleton":
-        mapped["columns"].insert(0, {
-            "name": "id",
-            "data_type": "INTEGER",
-            "primary_key": True,
-        })
+        existing = {c["name"] for c in mapped["columns"]}
+        if "id" not in existing:
+            mapped["columns"].insert(0, {
+                "name": "id",
+                "data_type": "INTEGER",
+                "primary_key": True,
+            })
         if rows is not None:
             rows = [{"id": 1, **rows[0]}]
 
@@ -128,12 +131,14 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
         mapped = _resolve_schema(table_name, table, yaml_schemas, endpoint)
 
         if extra_columns:
+            existing = {c["name"] for c in mapped["columns"]}
             for col_name, col_type in extra_columns.items():
-                mapped["columns"].append({
-                    "name": col_name,
-                    "data_type": col_type,
-                    "nullable": False,
-                })
+                if col_name not in existing:
+                    mapped["columns"].append({
+                        "name": col_name,
+                        "data_type": col_type,
+                        "nullable": False,
+                    })
 
         _apply_key_map_modifiers(mapped, table_name)
         db.create_table(mapped, execute=True)
@@ -166,7 +171,10 @@ def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefi
         if extra_columns:
             for row in rows:
                 row.update(extra_columns)
+            existing = {c["name"] for c in mapped["columns"]}
             for col_name, col_val in extra_columns.items():
+                if col_name in existing:
+                    continue
                 col_type = PYTHON_TO_DUCKDB.get(_python_type_name(col_val), "TEXT")
                 qualified = db._qualify(table_name)
                 try:

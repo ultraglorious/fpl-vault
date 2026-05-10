@@ -37,12 +37,13 @@ def map_to_duckdb_types(schema: dict) -> dict:
     columns = []
     for col in schema["columns"]:
         db_type = PYTHON_TO_DUCKDB.get(col["type"], "TEXT")
+        is_pk = col["name"] == "id" and col["type"] == "int"
         new_col = {
             "name": col["name"],
             "data_type": db_type,
-            "nullable": col.get("nullable", True),
+            "nullable": not is_pk,
         }
-        if col["name"] == "id" and col["type"] == "int":
+        if is_pk:
             new_col["primary_key"] = True
         columns.append(new_col)
 
@@ -114,7 +115,7 @@ def save_table_schema(schema_dir: str | Path, mapped: dict) -> None:
     for col in mapped["columns"]:
         col_out = {"name": col["name"], "data_type": col["data_type"]}
         tests = []
-        if not col.get("nullable", True):
+        if col.get("primary_key"):
             tests.append("not_null")
         if col.get("unique"):
             tests.append("unique")

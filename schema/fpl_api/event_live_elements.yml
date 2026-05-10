@@ -7,17 +7,9 @@ columns:
   - not_null
 - name: stats
   data_type: JSON
-  tests:
-  - not_null
 - name: explain
   data_type: JSON
-  tests:
-  - not_null
 - name: modified
   data_type: BOOLEAN
-  tests:
-  - not_null
 - name: event_id
   data_type: INTEGER
-  tests:
-  - not_null

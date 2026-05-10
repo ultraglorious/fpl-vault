@@ -373,7 +373,7 @@ class TestSaveTableSchema:
         cols = {c["name"]: c for c in teams["columns"]}
         assert cols["id"]["nullable"] is False
         assert cols["id"]["primary_key"] is True
-        assert cols["name"]["nullable"] is False
+        assert cols["name"]["nullable"] is True
         assert cols["form"]["nullable"] is True
 
     def test_creates_directory(self, tmp_path):

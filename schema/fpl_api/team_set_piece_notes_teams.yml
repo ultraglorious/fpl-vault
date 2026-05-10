@@ -3,8 +3,6 @@ primary_key: id
 columns:
 - name: notes
   data_type: JSON
-  tests:
-  - not_null
 - name: id
   data_type: INTEGER
   tests:

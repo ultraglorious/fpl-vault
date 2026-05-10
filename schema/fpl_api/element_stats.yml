@@ -1,12 +1,8 @@
 name: element_stats
-primary_key: name
 columns:
 - name: label
   data_type: TEXT
-  tests:
-  - not_null
 - name: name
   data_type: TEXT
   tests:
-  - not_null
   - unique

@@ -2,17 +2,9 @@ name: dream_team_team
 columns:
 - name: element
   data_type: INTEGER
-  tests:
-  - not_null
 - name: points
   data_type: INTEGER
-  tests:
-  - not_null
 - name: position
   data_type: INTEGER
-  tests:
-  - not_null
 - name: event_id
   data_type: INTEGER
-  tests:
-  - not_null

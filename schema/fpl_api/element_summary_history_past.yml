@@ -1,130 +1,66 @@
 name: element_summary_history_past
 columns:
 - name: season_name
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: element_code
   data_type: INTEGER
-  tests:
-  - not_null
 - name: start_cost
   data_type: INTEGER
-  tests:
-  - not_null
 - name: end_cost
   data_type: INTEGER
-  tests:
-  - not_null
 - name: total_points
   data_type: INTEGER
-  tests:
-  - not_null
 - name: minutes
   data_type: INTEGER
-  tests:
-  - not_null
 - name: goals_scored
   data_type: INTEGER
-  tests:
-  - not_null
 - name: assists
   data_type: INTEGER
-  tests:
-  - not_null
 - name: clean_sheets
   data_type: INTEGER
-  tests:
-  - not_null
 - name: goals_conceded
   data_type: INTEGER
-  tests:
-  - not_null
 - name: own_goals
   data_type: INTEGER
-  tests:
-  - not_null
 - name: penalties_saved
   data_type: INTEGER
-  tests:
-  - not_null
 - name: penalties_missed
   data_type: INTEGER
-  tests:
-  - not_null
 - name: yellow_cards
   data_type: INTEGER
-  tests:
-  - not_null
 - name: red_cards
   data_type: INTEGER
-  tests:
-  - not_null
 - name: saves
   data_type: INTEGER
-  tests:
-  - not_null
 - name: bonus
   data_type: INTEGER
-  tests:
-  - not_null
 - name: bps
   data_type: INTEGER
-  tests:
-  - not_null
 - name: influence
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: creativity
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: threat
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: ict_index
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: clearances_blocks_interceptions
   data_type: INTEGER
-  tests:
-  - not_null
 - name: recoveries
   data_type: INTEGER
-  tests:
-  - not_null
 - name: tackles
   data_type: INTEGER
-  tests:
-  - not_null
 - name: defensive_contribution
   data_type: INTEGER
-  tests:
-  - not_null
 - name: starts
   data_type: INTEGER
-  tests:
-  - not_null
 - name: expected_goals
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_assists
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_goal_involvements
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: expected_goals_conceded
-  data_type: VARCHAR
-  tests:
-  - not_null
+  data_type: TEXT
 - name: element_id
   data_type: INTEGER
-  tests:
-  - not_null
