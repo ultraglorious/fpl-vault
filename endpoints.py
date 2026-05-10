@@ -40,24 +40,17 @@ def _json_columns(schema: dict) -> set[str]:
     return {c["name"] for c in schema["columns"] if c["data_type"] == "JSON"}
 
 
-def _normalize_dtype(dtype: str) -> str:
-    """Normalize equivalent DuckDB type names so VARCHAR/TEXT don't trigger false drift."""
-    return "VARCHAR" if dtype in ("TEXT", "VARCHAR") else dtype
-
-
 def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict, endpoint: str) -> None:
-    """Compare inferred schema against YAML and log any drift to discovery.jsonl."""
-    inferred_cols = {c["name"]: _normalize_dtype(PYTHON_TO_DUCKDB.get(c["type"], c["type"])) for c in inferred["columns"]}
-    yaml_cols = {c["name"]: _normalize_dtype(c["data_type"]) for c in yaml_schema["columns"]}
+    """Log any new columns the API returns that aren't yet in the YAML schema."""
+    inferred_names = {c["name"] for c in inferred["columns"]}
+    yaml_names = {c["name"] for c in yaml_schema["columns"]}
 
-    for col in set(inferred_cols) - set(yaml_cols):
-        print(f"  [DRIFT] {table_name}: new column '{col}' ({inferred_cols[col]})")
-        log_discovery(endpoint, table_name, "new_column", column=col, type=inferred_cols[col])
-
-    for name in set(inferred_cols) & set(yaml_cols):
-        if inferred_cols[name] != yaml_cols[name]:
-            print(f"  [DRIFT] {table_name}.{name}: API={inferred_cols[name]}, YAML={yaml_cols[name]}")
-            log_discovery(endpoint, table_name, "type_change", column=name, was=yaml_cols[name], now=inferred_cols[name])
+    for col in sorted(inferred_names - yaml_names):
+        dtype = PYTHON_TO_DUCKDB.get(
+            next(c["type"] for c in inferred["columns"] if c["name"] == col), "TEXT"
+        )
+        print(f"  [DRIFT] {table_name}: new column '{col}' ({dtype})")
+        log_discovery(endpoint, table_name, "new_column", column=col, type=dtype)
 
 
 def _resolve_schema(table_name, inferred, yaml_schemas, endpoint):
