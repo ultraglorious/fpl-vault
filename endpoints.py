@@ -98,7 +98,7 @@ def _validate_and_log_schema(table_name: str, inferred: dict, yaml_schema: dict,
     for name in set(inferred_cols) & set(yaml_cols):
         if inferred_cols[name] != yaml_cols[name]:
             print(f"  [DRIFT] {table_name}.{name}: API={inferred_cols[name]}, YAML={yaml_cols[name]}")
-            log_discovery(endpoint, table_name, "type_change", column=name, was=inferred_cols[name], now=yaml_cols[name])
+            log_discovery(endpoint, table_name, "type_change", column=name, was=yaml_cols[name], now=inferred_cols[name])
 
 
 def _resolve_schema(table_name, inferred, yaml_schemas, endpoint):
@@ -116,6 +116,44 @@ def _response_key(table_name: str, table_prefix: str = "") -> str:
     if table_prefix:
         return table_name[len(table_prefix) + 1:]
     return table_name
+
+
+def _apply_key_map_modifiers(mapped, table_name, rows=None):
+    """Inject synthetic columns and uniqueness from TABLE_KEY_MAP. Returns rows (may be wrapped for singletons)."""
+    key_info = TABLE_KEY_MAP.get(table_name, {})
+    pk_value = mapped.get("primary_key")
+
+    if pk_value == "!singleton":
+        mapped["columns"].insert(0, {
+            "name": "id",
+            "data_type": "INTEGER",
+            "primary_key": True,
+        })
+        if rows is not None:
+            rows = [{"id": 1, **rows[0]}]
+
+    if key_info.get("type") == "unique_on" and len(key_info["columns"]) == 1:
+        col_name = key_info["columns"][0]
+        for col in mapped["columns"]:
+            if col["name"] == col_name:
+                col["unique"] = True
+
+    return rows
+
+
+def _ensure_unique_index(db, table_name):
+    """Create a composite UNIQUE INDEX for multi-column unique_on tables, if needed."""
+    key_info = TABLE_KEY_MAP.get(table_name, {})
+    if key_info.get("type") == "unique_on" and len(key_info["columns"]) > 1:
+        qualified = db._qualify(table_name)
+        cols = ", ".join(key_info["columns"])
+        try:
+            db.conn.execute(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique "
+                f"ON {qualified} ({cols})"
+            )
+        except Exception:
+            pass
 
 
 def _init_tables(tables, db, endpoint, extra_columns=None):
@@ -139,36 +177,9 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
                     "nullable": False,
                 })
 
-        key_info = TABLE_KEY_MAP.get(table_name, {})
-        pk_value = mapped.get("primary_key")
-
-        if pk_value == "!singleton":
-            mapped["columns"].insert(0, {
-                "name": "id",
-                "data_type": "INTEGER",
-                "primary_key": True,
-            })
-
-        if key_info.get("type") == "unique_on":
-            cols = key_info["columns"]
-            if len(cols) == 1:
-                for col in mapped["columns"]:
-                    if col["name"] == cols[0]:
-                        col["unique"] = True
-            # Composite: create table first, then add UNIQUE INDEX
-
+        _apply_key_map_modifiers(mapped, table_name)
         db.create_table(mapped, execute=True)
-
-        if key_info.get("type") == "unique_on" and len(key_info["columns"]) > 1:
-            qualified = db._qualify(table_name)
-            cols = ", ".join(key_info["columns"])
-            try:
-                db.conn.execute(
-                    f"CREATE UNIQUE INDEX idx_{table_name}_unique "
-                    f"ON {qualified} ({cols})"
-                )
-            except Exception:
-                pass
+        _ensure_unique_index(db, table_name)
 
         _append_to_datasources_yml(table_name, mapped, endpoint)
         log_discovery(endpoint, table_name, "table_created")
@@ -212,33 +223,8 @@ def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefi
                     "nullable": False,
                 })
 
-        key_info = TABLE_KEY_MAP.get(table_name, {})
-        pk_value = mapped.get("primary_key")
-
-        if pk_value == "!singleton":
-            mapped["columns"].insert(0, {
-                "name": "id",
-                "data_type": "INTEGER",
-                "primary_key": True,
-            })
-            rows = [{"id": 1, **rows[0]}]
-
-        if key_info.get("type") == "unique_on":
-            cols = key_info["columns"]
-            if len(cols) == 1:
-                for col in mapped["columns"]:
-                    if col["name"] == cols[0]:
-                        col["unique"] = True
-            else:
-                qualified = db._qualify(table_name)
-                col_list = ", ".join(cols)
-                try:
-                    db.conn.execute(
-                        f"CREATE UNIQUE INDEX idx_{table_name}_unique "
-                        f"ON {qualified} ({col_list})"
-                    )
-                except Exception:
-                    pass
+        rows = _apply_key_map_modifiers(mapped, table_name, rows)
+        _ensure_unique_index(db, table_name)
 
         pk_columns = _detect_pk_columns(mapped, table_name)
         json_cols = _json_columns(mapped)
