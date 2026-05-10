@@ -51,7 +51,6 @@ Schema creation and data ingestion are separate steps. Run `--init` first to cre
 - **`api_client.py`** — Thin wrapper around `requests` with session reuse, 3-retry exponential backoff, and 30s timeout.
 - **`database_manager.py`** — `DatabaseManager(db_path)` opens a DuckDB connection. Key functions: `create_table()` (generate + optionally execute DDL), `upsert_rows()` (`INSERT … ON CONFLICT DO UPDATE`), `fetch_column()` (for parameterized loops), `table_exists()`, `backup_db()` (timestamped `.bak` copies). Module-level functions: `load_table_schemas(dir)` globs per-table YAML files from a directory, `save_table_schema(dir, schema)` writes one table to its own YAML file, `map_to_duckdb_types()` converts inferred Python types to DuckDB types.
 - **`infer_endpoint_schema.py`** — Takes a JSON API response dict and produces table schemas. `infer_response_schema()` walks top-level keys with optional `table_prefix` for nested endpoints. `infer_record_schema()` extracts column names, types (with ISO datetime detection), and nullability from record arrays.
-- **`ingest.py`** — Legacy single-endpoint script for `bootstrap-static`. Still works standalone but bootstrap-static is also available as a pipeline task.
 
 ### Schema files
 
