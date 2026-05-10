@@ -1,0 +1,59 @@
+name: element_summary_fixtures
+primary_key: id
+columns:
+- name: id
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: code
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: team_h
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: team_h_score
+  data_type: VARCHAR
+- name: team_a
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: team_a_score
+  data_type: VARCHAR
+- name: event
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: finished
+  data_type: BOOLEAN
+  tests:
+  - not_null
+- name: minutes
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: provisional_start_time
+  data_type: BOOLEAN
+  tests:
+  - not_null
+- name: kickoff_time
+  data_type: TIMESTAMP
+  tests:
+  - not_null
+- name: event_name
+  data_type: VARCHAR
+  tests:
+  - not_null
+- name: is_home
+  data_type: BOOLEAN
+  tests:
+  - not_null
+- name: difficulty
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: element_id
+  data_type: INTEGER
+  tests:
+  - not_null

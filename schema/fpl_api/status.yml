@@ -1,0 +1,19 @@
+name: status
+primary_key: event
+columns:
+- name: bonus_added
+  data_type: BOOLEAN
+  tests:
+  - not_null
+- name: date
+  data_type: VARCHAR
+  tests:
+  - not_null
+- name: event
+  data_type: INTEGER
+  tests:
+  - not_null
+- name: points
+  data_type: VARCHAR
+  tests:
+  - not_null
