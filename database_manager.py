@@ -26,6 +26,7 @@ def backup_db(db_path: str, backup_dir: str | None = None) -> str | None:
         backup_dir = os.path.join(os.getenv("DATA_DIR", "data"), "backups")
     filename = os.path.basename(db_path)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    os.makedirs(backup_dir, exist_ok=True)
     backup_path = os.path.join(backup_dir, f"{filename}.{timestamp}.bak")
     shutil.copy2(db_path, backup_path)
     print(f"Backed up {db_path} -> {backup_path}")

@@ -83,7 +83,7 @@ def _apply_key_map_modifiers(mapped, table_name, rows=None):
                 "primary_key": True,
             })
         if rows is not None:
-            rows = [{"id": 1, **rows[0]}]
+            rows = [{**rows[0], "id": 1}]
 
     if key_info.get("type") == "unique_on" and len(key_info["columns"]) == 1:
         col_name = key_info["columns"][0]
