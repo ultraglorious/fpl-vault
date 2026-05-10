@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 uv sync                     # Install dependencies
-uv run pytest               # Run all tests
+uv run pytest               # Run all tests (83 tests)
 uv run pytest -k "test_name"  # Run a single test
 uv run python infer_endpoint_schema.py  # Print CREATE TABLE statements from live API
 uv run python pipeline.py --init          # Infer schemas + create empty tables (dev DB)
@@ -14,6 +14,7 @@ uv run python pipeline.py --init --live   # Same against production DB
 uv run python pipeline.py                 # Ingest all endpoints into dev DB
 uv run python pipeline.py --live          # Ingest all endpoints into production DB (with backup)
 uv run python pipeline.py --tasks fixtures,event-status  # Run specific tasks only
+uv run python pipeline.py --init --tasks event-live     # Init a single parameterized endpoint
 ```
 
 ## Rules
@@ -23,8 +24,18 @@ uv run python pipeline.py --tasks fixtures,event-status  # Run specific tasks on
 
 ## Configuration
 
-Set `DB_NAME` and `DATA_DIR` in `.env` to control the database filename and directory (defaults: `footballdb`, `data`). Dev appends `_dev` to the name, live omits it.
-`REQUEST_DELAY` controls the pause (seconds) between API calls in parameterized loops (default: 0.5).
+All via `.env` (see `.env.example`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DB_NAME` | `footballdb` | Database filename |
+| `DATA_DIR` | `data` | Data and log directory |
+| `SCHEMA_DIR` | `schema/fpl_api` | Per-table schema YAML files |
+| `REQUEST_DELAY` | `0.5` | Seconds between API calls in parameterized loops |
+| `LIMIT_IDS` | `false` | Enable ID capping for fast dev runs |
+| `MAX_IDS` | `0` | Max IDs to process when `LIMIT_IDS` is on |
+
+Dev appends `_dev` to the database name, live omits it and takes a backup first.
 `.env.example` mirrors `.env` without secrets — keep both in sync when adding vars.
 
 ## Architecture
@@ -33,9 +44,40 @@ Ingests FPL data from undocumented public endpoints (`https://fantasy.premierlea
 
 Schema creation and data ingestion are separate steps. Run `--init` first to create empty tables from inferred schemas, then run normally to ingest data. Normal runs will fail if tables don't exist.
 
-- **`pipeline.py`** — Lightweight DAG orchestrator. `Pipeline` class runs tasks in dependency order (topological sort via Kahn's algorithm). `Task` is a named callable `(db) -> None`. Logs run state to `data/pipeline_runs.jsonl`. Two modes: `--init` (schema + table creation) and normal (data ingestion).
-- **`endpoints.py`** — Ingestion functions for all endpoints. `init_*` functions handle schema inference and table creation. `ingest_*` functions handle data upsert. Parameterized endpoints loop over IDs from existing tables and inject the parameter as a column (e.g. `event_id`).
+### Components
+
+- **`pipeline.py`** — Lightweight DAG orchestrator. `Pipeline` class runs tasks in dependency order (topological sort via Kahn's algorithm). `Task` is a named callable `(db) -> None`. Tracks progress atomically in `data/pipeline_progress.json` and logs each execution to `data/pipeline_runs.jsonl`. Two modes: `--init` (schema + table creation) and normal (data ingestion). `--tasks` flag runs a named subset.
+- **`endpoints.py`** — Ingestion functions for all endpoints. `init_*` functions handle schema inference and table creation. `ingest_*` functions handle data upsert. Parameterized endpoints loop over IDs from existing tables and inject the parameter as a column (e.g. `event_id`). Key internal helpers: `_resolve_schema()` prefers YAML over inferred types and logs drift via `_validate_and_log_schema()`, `_apply_key_map_modifiers()` handles singleton tables and composite unique indexes per `TABLE_KEY_MAP`.
 - **`api_client.py`** — Thin wrapper around `requests` with session reuse, 3-retry exponential backoff, and 30s timeout.
-- **`database_manager.py`** — `DatabaseManager(db_path)` opens a DuckDB connection. `create_table()` generates valid `CREATE TABLE` statements; pass `execute=True` to also run them. `upsert_rows()` upserts with `ON CONFLICT DO UPDATE`. `fetch_column()` reads a column from a table. `table_exists()` checks if a table exists. `backup_db()` creates timestamped `.bak` copies.
-- **`infer_endpoint_schema.py`** — Takes a JSON API response dict and produces table schemas. `infer_response_schema()` walks top-level keys with optional `table_prefix` for nested endpoints. `infer_record_schema()` extracts column types from record arrays.
+- **`database_manager.py`** — `DatabaseManager(db_path)` opens a DuckDB connection. Key functions: `create_table()` (generate + optionally execute DDL), `upsert_rows()` (`INSERT … ON CONFLICT DO UPDATE`), `fetch_column()` (for parameterized loops), `table_exists()`, `backup_db()` (timestamped `.bak` copies). Module-level functions: `load_table_schemas(dir)` globs per-table YAML files from a directory, `save_table_schema(dir, schema)` writes one table to its own YAML file, `map_to_duckdb_types()` converts inferred Python types to DuckDB types.
+- **`infer_endpoint_schema.py`** — Takes a JSON API response dict and produces table schemas. `infer_response_schema()` walks top-level keys with optional `table_prefix` for nested endpoints. `infer_record_schema()` extracts column names, types (with ISO datetime detection), and nullability from record arrays.
 - **`ingest.py`** — Legacy single-endpoint script for `bootstrap-static`. Still works standalone but bootstrap-static is also available as a pipeline task.
+
+### Schema files
+
+Table schemas live as individual YAML files under `schema/fpl_api/` (configurable via `SCHEMA_DIR`):
+
+```yaml
+name: teams
+primary_key: id
+columns:
+  - name: id
+    data_type: INTEGER
+    tests: [not_null]
+```
+
+`--init` writes them; subsequent runs read them as the authoritative source. If the API diverges, drift events are logged to `data/discovery.jsonl`.
+
+`TABLE_KEY_MAP` in `endpoints.py` covers tables without a natural primary key — singleton tables (inject `id = 1`), single-column unique keys, and composite unique indexes.
+
+### Log files
+
+| File | Format | Contents |
+|---|---|---|
+| `data/pipeline_runs.jsonl` | Append-only JSONL | Every task execution: started/success/failed with duration |
+| `data/pipeline_progress.json` | Atomic JSON (write-then-rename) | Current run snapshot: per-task status and loop progress |
+| `data/discovery.jsonl` | Append-only JSONL | Schema drift: new/missing columns, type changes, table creation |
+
+### Tests
+
+83 tests in 4 files with 100% pass rate. `conftest.py` isolates tests from the real filesystem by redirecting `SCHEMA_DIR` to a temp directory via `pytest_configure`.
