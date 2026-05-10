@@ -37,8 +37,3 @@ class APIClient:
         response = self._request_with_retry("POST", f"{self.base_url}{endpoint}", json=json_data, headers=headers)
         return response.json()
 
-    def put(self, endpoint: str, json_data: dict, headers=None) -> dict:
-        pass
-
-    def delete(self, endpoint: str, headers=None) -> dict:
-        pass
