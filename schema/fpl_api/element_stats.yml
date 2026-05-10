@@ -1,8 +1,0 @@
-name: element_stats
-columns:
-- name: label
-  data_type: TEXT
-- name: name
-  data_type: TEXT
-  tests:
-  - unique

@@ -23,3 +23,6 @@ wheels/
 *.duckdb.wal
 *.bak
 data/
+
+# Generated schema files
+schema/fpl_api/
