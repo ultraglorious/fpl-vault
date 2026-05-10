@@ -52,52 +52,79 @@ def map_to_duckdb_types(schema: dict) -> dict:
     return result
 
 
-def load_table_schemas(yml_path: str | Path) -> dict[str, dict]:
-    """Read a dbt-format datasources.yml and return schema dicts for create_table().
+def _parse_table_yaml(data: dict) -> dict:
+    """Parse a per-table YAML dict into a schema dict for create_table()."""
+    table_name = data["name"]
+    primary_key = data.get("primary_key")
+    columns = []
 
-    Returns a dict keyed by table name. Each value is a schema dict with
-    ``table_name`` and ``columns``, compatible with DatabaseManager.create_table().
-    The ``primary_key`` table-level field in the YAML is preserved as a top-level
-    key on the schema dict (ingest.py uses it for upsert detection).
-    """
-    path = Path(yml_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Schema file not found: {path}")
+    for col in data.get("columns", []):
+        col_def: dict = {
+            "name": col["name"],
+            "data_type": col["data_type"],
+        }
+        tests = col.get("tests", [])
+        col_def["nullable"] = "not_null" not in tests
+        if primary_key is not None and col["name"] == primary_key:
+            col_def["primary_key"] = True
+        columns.append(col_def)
 
-    with open(path, "r") as f:
-        data = yaml.safe_load(f)
+    schema_dict: dict = {"table_name": table_name, "columns": columns}
+    if primary_key is not None:
+        schema_dict["primary_key"] = primary_key
+    return schema_dict
+
+
+def load_table_schemas(schema_dir: str | Path = "schema/fpl_api") -> dict[str, dict]:
+    """Load per-table YAML files from a directory. Returns schema dicts keyed by table name."""
+    dir_path = Path(schema_dir)
+    if not dir_path.exists():
+        return {}
 
     schemas: dict[str, dict] = {}
-
-    for source in data.get("sources", []):
-        for table in source.get("tables", []):
-            table_name = table["name"]
-            primary_key = table.get("primary_key")
-            columns = []
-
-            for col in table.get("columns", []):
-                col_def: dict = {
-                    "name": col["name"],
-                    "data_type": col["data_type"],
-                }
-                tests = col.get("tests", [])
-                if "not_null" in tests:
-                    col_def["nullable"] = False
-                else:
-                    col_def["nullable"] = True
-                if primary_key is not None and col["name"] == primary_key:
-                    col_def["primary_key"] = True
-                columns.append(col_def)
-
-            schema_dict: dict = {
-                "table_name": table_name,
-                "columns": columns,
-            }
-            if primary_key is not None:
-                schema_dict["primary_key"] = primary_key
-            schemas[table_name] = schema_dict
+    for yml_file in sorted(dir_path.glob("*.yml")):
+        with open(yml_file, "r") as f:
+            data = yaml.safe_load(f)
+        if data is None:
+            continue
+        schema_dict = _parse_table_yaml(data)
+        schemas[schema_dict["table_name"]] = schema_dict
 
     return schemas
+
+
+def save_table_schema(schema_dir: str | Path, mapped: dict) -> None:
+    """Write a single table schema to schema_dir/<table_name>.yml."""
+    dir_path = Path(schema_dir)
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    table_name = mapped["table_name"]
+    out: dict = {"name": table_name}
+    pk = mapped.get("primary_key")
+    if pk is None:
+        pk_cols = [c["name"] for c in mapped["columns"] if c.get("primary_key")]
+        if len(pk_cols) == 1:
+            pk = pk_cols[0]
+    if pk is not None:
+        out["primary_key"] = pk
+
+    columns = []
+    for col in mapped["columns"]:
+        col_out = {"name": col["name"], "data_type": col["data_type"]}
+        tests = []
+        if not col.get("nullable", True):
+            tests.append("not_null")
+        if col.get("unique"):
+            tests.append("unique")
+        if tests:
+            col_out["tests"] = tests
+        columns.append(col_out)
+    out["columns"] = columns
+
+    file_path = dir_path / f"{table_name}.yml"
+    with open(file_path, "w") as f:
+        yaml.dump(out, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    print(f"  Wrote {file_path}")
 
 
 class DatabaseManager:

@@ -293,26 +293,21 @@ class TestUpsertRows:
 
 class TestLoadTableSchemas:
     def test_loads_tables_from_yaml(self, tmp_path):
-        yml = tmp_path / "datasources.yml"
+        yml = tmp_path / "teams.yml"
         yml.write_text("""
-version: 2
-sources:
-  - name: fpl_api
-    schema: fpl_api
-    tables:
-      - name: teams
-        primary_key: id
-        columns:
-          - name: id
-            data_type: INTEGER
-            tests: [unique, not_null]
-          - name: name
-            data_type: TEXT
-            tests: [not_null]
-          - name: form
-            data_type: TEXT
+name: teams
+primary_key: id
+columns:
+  - name: id
+    data_type: INTEGER
+    tests: [unique, not_null]
+  - name: name
+    data_type: TEXT
+    tests: [not_null]
+  - name: form
+    data_type: TEXT
 """)
-        schemas = load_table_schemas(str(yml))
+        schemas = load_table_schemas(str(tmp_path))
         assert "teams" in schemas
         teams = schemas["teams"]
         assert teams["table_name"] == "teams"
@@ -327,28 +322,63 @@ sources:
         assert cols["form"]["nullable"] is True
 
     def test_handles_singleton_primary_key(self, tmp_path):
-        yml = tmp_path / "datasources.yml"
+        yml = tmp_path / "game_settings.yml"
         yml.write_text("""
-version: 2
-sources:
-  - name: fpl_api
-    schema: fpl_api
-    tables:
-      - name: game_settings
-        primary_key: "!singleton"
-        columns:
-          - name: league_max_team
-            data_type: INTEGER
-            tests: [not_null]
+name: game_settings
+primary_key: "!singleton"
+columns:
+  - name: league_max_team
+    data_type: INTEGER
+    tests: [not_null]
 """)
-        schemas = load_table_schemas(str(yml))
+        schemas = load_table_schemas(str(tmp_path))
         assert "game_settings" in schemas
         gs = schemas["game_settings"]
         assert gs["primary_key"] == "!singleton"
         assert gs["columns"][0].get("primary_key") is not True
 
-    def test_missing_file_raises(self, tmp_path):
-        missing = tmp_path / "nonexistent.yml"
-        import pytest
-        with pytest.raises(FileNotFoundError):
-            load_table_schemas(str(missing))
+    def test_empty_directory_returns_empty_dict(self, tmp_path):
+        schemas = load_table_schemas(str(tmp_path))
+        assert schemas == {}
+
+    def test_multiple_files(self, tmp_path):
+        (tmp_path / "teams.yml").write_text("name: teams\ncolumns:\n  - name: id\n    data_type: INTEGER\n")
+        (tmp_path / "events.yml").write_text("name: events\ncolumns:\n  - name: id\n    data_type: INTEGER\n")
+        schemas = load_table_schemas(str(tmp_path))
+        assert set(schemas.keys()) == {"teams", "events"}
+
+
+class TestSaveTableSchema:
+    def test_writes_and_roundtrips(self, tmp_path):
+        mapped = {
+            "table_name": "teams",
+            "primary_key": "id",
+            "columns": [
+                {"name": "id", "data_type": "INTEGER", "nullable": False, "primary_key": True},
+                {"name": "name", "data_type": "TEXT", "nullable": False},
+                {"name": "form", "data_type": "TEXT", "nullable": True},
+            ],
+        }
+        from database_manager import save_table_schema
+        save_table_schema(str(tmp_path), mapped)
+
+        yml_file = tmp_path / "teams.yml"
+        assert yml_file.exists()
+
+        schemas = load_table_schemas(str(tmp_path))
+        assert "teams" in schemas
+        teams = schemas["teams"]
+        assert teams["table_name"] == "teams"
+        assert teams["primary_key"] == "id"
+        cols = {c["name"]: c for c in teams["columns"]}
+        assert cols["id"]["nullable"] is False
+        assert cols["id"]["primary_key"] is True
+        assert cols["name"]["nullable"] is False
+        assert cols["form"]["nullable"] is True
+
+    def test_creates_directory(self, tmp_path):
+        schema_dir = tmp_path / "new_schema"
+        mapped = {"table_name": "t", "columns": [{"name": "id", "data_type": "INTEGER", "nullable": False}]}
+        from database_manager import save_table_schema
+        save_table_schema(str(schema_dir), mapped)
+        assert (schema_dir / "t.yml").exists()

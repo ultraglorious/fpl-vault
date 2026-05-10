@@ -3,12 +3,12 @@ import time
 from pathlib import Path
 
 from api_client import APIClient
-from database_manager import PYTHON_TO_DUCKDB, load_table_schemas, map_to_duckdb_types
+from database_manager import PYTHON_TO_DUCKDB, load_table_schemas, map_to_duckdb_types, save_table_schema
 from infer_endpoint_schema import _python_type_name, infer_response_schema
 from pipeline import log_discovery, update_task_progress
 
 API_BASE = "https://fantasy.premierleague.com/api/"
-SCHEMA_YML = "datasources.yml"
+SCHEMA_DIR = os.getenv("SCHEMA_DIR", "schema/fpl_api")
 REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", "0.5"))
 _limit_ids = os.getenv("LIMIT_IDS", "").lower() in ("1", "true", "yes")
 MAX_IDS = int(os.getenv("MAX_IDS", "0")) if _limit_ids else None
@@ -22,48 +22,6 @@ TABLE_KEY_MAP = {
     "element_summary_history": {"type": "unique_on", "columns": ["element", "fixture"]},
     "element_summary_history_past": {"type": "unique_on", "columns": ["element_id", "season_name"]},
 }
-
-
-def _append_to_datasources_yml(table_name: str, mapped: dict, endpoint: str) -> None:
-    """Append a new table stanza to datasources.yml without reformatting existing content."""
-    path = Path(SCHEMA_YML)
-    if not path.exists():
-        return
-
-    existing_text = path.read_text()
-    if f"name: {table_name}" in existing_text:
-        return
-
-    pk_cols = [c["name"] for c in mapped["columns"] if c.get("primary_key")]
-    primary_key = pk_cols[0] if len(pk_cols) == 1 else None
-    key_info = TABLE_KEY_MAP.get(table_name)
-    if key_info and key_info["type"] == "unique_on":
-        primary_key = key_info["columns"][0] if len(key_info["columns"]) == 1 else None
-    elif key_info and key_info["type"] == "singleton":
-        primary_key = "!singleton"
-
-    lines = []
-    lines.append(f"      - name: {table_name}")
-    if primary_key:
-        lines.append(f"        primary_key: {primary_key}")
-    lines.append("        columns:")
-
-    for col in mapped["columns"]:
-        lines.append(f"          - name: {col['name']}")
-        lines.append(f"            data_type: {col['data_type']}")
-        tests = []
-        if not col.get("nullable", True):
-            tests.append("not_null")
-        if col.get("unique"):
-            tests.append("unique")
-        if tests:
-            tests_str = ", ".join(tests)
-            lines.append(f"            tests: [{tests_str}]")
-
-    stanza = "\n".join(lines) + "\n"
-    with open(path, "a") as f:
-        f.write(stanza)
-    print(f"  Added {table_name} to {SCHEMA_YML}")
 
 
 def _detect_pk_columns(schema: dict, table_name: str) -> list[str]:
@@ -107,7 +65,7 @@ def _resolve_schema(table_name, inferred, yaml_schemas, endpoint):
     if yaml_schema:
         _validate_and_log_schema(table_name, inferred, yaml_schema, endpoint)
         return yaml_schema
-    print(f"  [WARN] {table_name} not in {SCHEMA_YML} — using inferred types")
+    print(f"  [WARN] {table_name} not in {SCHEMA_DIR} — using inferred types")
     return map_to_duckdb_types(inferred)
 
 
@@ -123,7 +81,7 @@ def _apply_key_map_modifiers(mapped, table_name, rows=None):
     key_info = TABLE_KEY_MAP.get(table_name, {})
     pk_value = mapped.get("primary_key")
 
-    if pk_value == "!singleton":
+    if pk_value == "!singleton" or key_info.get("type") == "singleton":
         mapped["columns"].insert(0, {
             "name": "id",
             "data_type": "INTEGER",
@@ -158,7 +116,7 @@ def _ensure_unique_index(db, table_name):
 
 def _init_tables(tables, db, endpoint, extra_columns=None):
     """Create empty tables from inferred schemas if they don't already exist."""
-    yaml_schemas = load_table_schemas(SCHEMA_YML)
+    yaml_schemas = load_table_schemas(SCHEMA_DIR)
 
     for table in tables:
         table_name = table["table_name"]
@@ -181,13 +139,13 @@ def _init_tables(tables, db, endpoint, extra_columns=None):
         db.create_table(mapped, execute=True)
         _ensure_unique_index(db, table_name)
 
-        _append_to_datasources_yml(table_name, mapped, endpoint)
+        save_table_schema(SCHEMA_DIR, mapped)
         log_discovery(endpoint, table_name, "table_created")
 
 
 def _ingest_rows(tables, response, db, endpoint, extra_columns=None, table_prefix=""):
     """Upsert API response rows into existing database tables."""
-    yaml_schemas = load_table_schemas(SCHEMA_YML)
+    yaml_schemas = load_table_schemas(SCHEMA_DIR)
 
     for table in tables:
         table_name = table["table_name"]

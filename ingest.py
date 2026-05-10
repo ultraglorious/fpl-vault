@@ -43,7 +43,7 @@ def _json_columns(schema: dict) -> set[str]:
     return {c["name"] for c in schema["columns"] if c["data_type"] == "JSON"}
 
 
-SCHEMA_YML = "datasources.yml"
+SCHEMA_DIR = os.getenv("SCHEMA_DIR", "schema/fpl_api")
 
 
 def _validate_schema(table_name: str, inferred: dict, yaml_schema: dict) -> None:
@@ -59,12 +59,12 @@ def _validate_schema(table_name: str, inferred: dict, yaml_schema: dict) -> None
             type_diffs.append((name, inferred_cols[name], yaml_cols[name]))
 
     if new_cols:
-        print(f"  [DRIFT] {table_name}: new columns in API not in datasources.yml: {new_cols}")
+        print(f"  [DRIFT] {table_name}: new columns in API not in schema directory: {new_cols}")
     if missing_cols:
-        print(f"  [DRIFT] {table_name}: columns in datasources.yml missing from API: {missing_cols}")
+        print(f"  [DRIFT] {table_name}: columns in schema directory missing from API: {missing_cols}")
     if type_diffs:
         for name, inf_type, yml_type in type_diffs:
-            print(f"  [DRIFT] {table_name}.{name}: API has {inf_type}, datasources.yml has {yml_type}")
+            print(f"  [DRIFT] {table_name}.{name}: API has {inf_type}, schema directory has {yml_type}")
 
 
 def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
@@ -76,7 +76,7 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
     response = client.get(endpoint=endpoint)
     tables = infer_response_schema(response)
 
-    yaml_schemas = load_table_schemas(SCHEMA_YML)
+    yaml_schemas = load_table_schemas(SCHEMA_DIR)
 
     for table in tables:
         table_name = table["table_name"]
@@ -86,7 +86,7 @@ def ingest_endpoint(endpoint: str, db: DatabaseManager) -> None:
             mapped = yaml_schema
             _validate_schema(table_name, table, yaml_schema)
         else:
-            print(f"  [WARN] {table_name} not in {SCHEMA_YML} — using inferred types")
+            print(f"  [WARN] {table_name} not in {SCHEMA_DIR} — using inferred types")
             mapped = map_to_duckdb_types(table)
 
         rows = response[table_name]
