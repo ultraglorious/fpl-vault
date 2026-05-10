@@ -16,6 +16,11 @@ uv run python pipeline.py --live          # Ingest all endpoints into production
 uv run python pipeline.py --tasks fixtures,event-status  # Run specific tasks only
 ```
 
+## Rules
+
+- **Never** add Co-Authored-By, Signed-off-by, or similar trailer lines to git commits.
+- **Never** `cd` to the current working directory in bash commands. The shell starts in the project root — just run the command directly.
+
 ## Configuration
 
 Set `DB_NAME` and `DATA_DIR` in `.env` to control the database filename and directory (defaults: `footballdb`, `data`). Dev appends `_dev` to the name, live omits it.
